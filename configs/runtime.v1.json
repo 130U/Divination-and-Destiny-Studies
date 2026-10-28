@@ -1,0 +1,10 @@
+{
+  "version": "1.0.0",
+  "session_ttl_ms": 1800000,
+  "max_sessions": 100,
+  "max_request_bytes": 262144,
+  "max_prompt_characters": 100000,
+  "review_max_output_tokens": 8192,
+  "analysis_max_output_tokens": 8192,
+  "max_concurrent_model_calls": 1
+}
