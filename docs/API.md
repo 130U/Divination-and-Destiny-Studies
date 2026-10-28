@@ -81,13 +81,14 @@
   },
   usage: { inputTokens: number, outputTokens: number, totalTokens: number },
   model: string,
+  providerModel?: string,
   requestId?: string,
   durationMs: number,
   cached: boolean
 }
 ```
 
-`ranking` 必须恰好包含每个候选一次，不能新增或省略候选。推荐盘须排第一并有已知回答作为支持；不确定结果的推荐 ID 必须为 null。问卷引用只能指向本会话中的已知实质回答，同一候选不能把同一题同时列为支持和反证。所有校盘回答均无已知实质信息时，直接返回 `INSUFFICIENT_EVIDENCE`，不请求模型。
+`ranking` 必须恰好包含每个候选一次，不能新增或省略候选。推荐盘须排第一并有已知回答作为支持；不确定结果的推荐 ID 必须为 null。服务端在模型 payload 中提供 `referenceable_evidence_ids`，与校验器共用已知事实白名单；这不是调用本地 HTTP API 时需要填写的新字段。引用必须逐字来自白名单，数组内不得重复，unknown / 不适用回答不得引用为事实。同一候选不能把同一题同时列为支持和反证。所有校盘回答均无已知实质信息时，直接返回 `INSUFFICIENT_EVIDENCE`，不请求模型。
 
 ## 3. 深入分析一个工作盘
 
@@ -115,9 +116,11 @@ analysis: {
 }
 ```
 
-返回的工作盘 ID 必须与请求选择一致。`chart_basis` 只能引用服务端在模型输入 `chart_reference_paths` 中提供的实际字段路径，例如 `pillars.day`、`features.luckCycles`；它不接受任意盘内断语。回答引用也须存在；没有事实引用的段落须列出未知项，全文至少有一个事实引用和一个盘内引用。这些检查验证引用对象和结构，不验证解释文字、因果推断或预测语义正确。
+返回的工作盘 ID 必须与请求选择一致。`chart_basis` 只能引用服务端在模型输入 `chart_reference_paths` 中提供的实际字段路径，例如 `pillars.day`、`features.luckCycles`；它不接受任意盘内断语。分析的 `referenceable_evidence_ids` 来自校盘材料与背景材料中的已知回答；所有段落和情景引用遵守同一白名单。没有事实引用的段落使用 `evidence_ids: []` 并列出 `uncertainties`，全文至少有一个事实引用和一个盘内引用。这些检查验证引用对象和结构，不验证解释文字、因果推断或预测语义正确。
 
 `usage` 来自实际提供方响应，可能额外包含 `cachedInputTokens`、`reasoningTokens`。`cached: true` 表示返回本地已有成功结果，此次没有新的模型请求；其中用量仍描述原请求，不能再次累计为本次费用。
+
+`model` 是请求配置名；可选 `providerModel` 是经过格式和凭据过滤的提供方返回标签。2026-10-28 的合成重测中两者均为 `deepseek-flash`，它们不能独立确认实际使用了 1017 快照。
 
 ## 会话、费用与错误
 
@@ -140,3 +143,7 @@ analysis: {
 | 503 | `DEEPSEEK_NOT_CONFIGURED`、`DEEPSEEK_INVALID_CONFIG` | 服务端未配置或配置无效 |
 
 当前默认预算见 [`configs/runtime.v1.json`](../configs/runtime.v1.json)：请求体 256 KiB、模型输入 JSON 100,000 字符、每次输出上限 8,192 tokens、最多 100 个内存会话。服务端不回传 API 密钥或原始提供方错误正文。
+
+## 已完成的合成验收
+
+2026-10-28 真实重测通过两阶段结构、引用及缓存检查，使用 `deepseek-flash` + `medium`。3 个候选的 review 结果为 `insufficient_evidence`；脚本显式选取合成候选继续 analysis，不能视为成功识别出生时辰。该轮两次请求共 24,353 tokens，包含 reasoning 统计，不重复相加；缓存重复两个阶段均无新增请求。首轮曾在 analysis 引用校验失败，未保留其原始输出和用量；完整分阶段记录及限制见 [验证记录](VALIDATION.md)。

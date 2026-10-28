@@ -46,6 +46,39 @@ test('server session snapshots cannot be replaced by edited client-returned cand
   await assert.rejects(workflow.analyze(session.id, 'forged'), /本次计算的候选盘/);
 });
 
+test('model reference whitelist includes only known facts and excludes unknown and inapplicable answers', async () => {
+  const workflow = new Workflow({ client: { completeJson: async request => {
+    const payload = request.payload as { referenceable_evidence_ids: string[]; evidence: { id: string; informationStatus: string }[]; context?: { id: string; informationStatus: string }[] };
+    const all = [...payload.evidence, ...(payload.context ?? [])];
+    assert.deepEqual(payload.referenceable_evidence_ids, all.filter(item => item.informationStatus === 'known').map(item => item.id));
+    assert.ok(!payload.referenceable_evidence_ids.includes('B1_hair_whorl'));
+    assert.ok(!payload.referenceable_evidence_ids.includes('C8_childbearing_years'));
+    assert.match(request.system, /referenceable_evidence_ids/);
+    const data = fakeModelData(request);
+    if ('sections' in data) data.sections.push({ domain: '未知背景', text: '没有相关资料。', evidence_ids: [], chart_basis: [], uncertainties: ['未提供相关背景，不能推断。'] });
+    return fakeResponse(data);
+  } } });
+  const session = workflow.create(syntheticSubmission());
+  await workflow.review(session.id);
+  const analysis = await workflow.analyze(session.id);
+  assert.deepEqual(analysis.analysis.sections[1]!.evidence_ids, []);
+  workflow.dispose();
+});
+
+test('analysis still rejects unknown or inapplicable question IDs and duplicate factual references', async () => {
+  for (const ids of [['B1_hair_whorl'], ['C8_childbearing_years'], ['C1_major_turning_years', 'C1_major_turning_years']]) {
+    const workflow = new Workflow({ client: { completeJson: async request => {
+      const data = fakeModelData(request);
+      if ('sections' in data) data.sections[0]!.evidence_ids = ids;
+      return fakeResponse(data);
+    } } });
+    const session = workflow.create(syntheticSubmission());
+    await workflow.review(session.id);
+    await assert.rejects(workflow.analyze(session.id), /模型返回的结构或依据不完整/);
+    workflow.dispose();
+  }
+});
+
 test('unknown-only evidence avoids a paid request', async () => {
   let calls = 0;
   const workflow = new Workflow({ client: { completeJson: async request => { calls++; return fakeResponse(fakeModelData(request)); } } });

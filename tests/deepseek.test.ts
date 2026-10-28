@@ -54,6 +54,7 @@ test("default medium-thinking JSON request uses fixed endpoint, bounded tokens a
   assert.deepEqual(result.data, { ok: true });
   assert.deepEqual(result.usage, { inputTokens: 120, outputTokens: 80, totalTokens: 200, cachedInputTokens: 40, reasoningTokens: 30 });
   assert.equal(result.model, "deepseek-flash");
+  assert.equal(result.providerModel, "deepseek-flash");
   assert.equal(result.requestId, "request_fixture_1");
   assert.ok(result.durationMs >= 0);
 });
@@ -95,6 +96,15 @@ test("disabled thinking omits effort and accepts a lower output budget", async (
     return response();
   } });
   assert.equal((await client.completeJson({ ...request, maxOutputTokens: 512 })).model, "deepseek-pro");
+});
+
+test("provider model metadata preserves the response label without exposing invalid or secret values", async () => {
+  for (const model of ["deepseek-v4.1-flash-1017", "deepseek-" + env.DEEPSEEK_API_KEY, "raw private text"]) {
+    const client = createDeepSeekClient({ env, fetchImpl: async () => response(envelope({ model })) });
+    const result = await client.completeJson(request);
+    assert.equal(result.model, "deepseek-flash");
+    assert.equal(result.providerModel, model === "deepseek-v4.1-flash-1017" ? model : undefined);
+  }
 });
 
 test("invalid config and excessive tokens fail before transport", async () => {

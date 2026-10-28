@@ -34,6 +34,7 @@ export interface DeepSeekResult {
   data: unknown;
   usage: DeepSeekUsage;
   model: string;
+  providerModel?: string;
   requestId?: string;
   durationMs: number;
 }
@@ -186,7 +187,9 @@ export function createDeepSeekClient(options: DeepSeekOptions = {}): { completeJ
         const usage = usageFrom(envelope.usage);
         const requestId = typeof envelope.id === "string" && /^[a-z0-9_-]{1,128}$/i.test(envelope.id) &&
           !envelope.id.includes(apiKey) && !/^sk-/i.test(envelope.id) ? envelope.id : undefined;
-        return { data, usage, model, ...(requestId ? { requestId } : {}), durationMs: Math.max(0, Math.round(performance.now() - started)) };
+        const providerModel = typeof envelope.model === "string" && /^deepseek-[a-z0-9._-]{1,100}$/i.test(envelope.model) &&
+          !envelope.model.includes(apiKey) ? envelope.model : undefined;
+        return { data, usage, model, ...(providerModel ? { providerModel } : {}), ...(requestId ? { requestId } : {}), durationMs: Math.max(0, Math.round(performance.now() - started)) };
       };
       try { return await Promise.race([operation(), timeout]); }
       catch (error) {

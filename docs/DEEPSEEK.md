@@ -35,10 +35,12 @@ const result = await client.completeJson({
   payload: { question: "A fictional example" },
   maxOutputTokens: 2048
 });
-// result: { data, usage, model, requestId?, durationMs }
+// result: { data, usage, model, providerModel?, requestId?, durationMs }
 ```
 
-调用方必须在 system 中声明 JSON、提供实际业务结构与示例。客户端拒绝不包含 `json` 的 system。`data` 是未经业务 schema 验证的 JSON 对象；不会返回模型的 `reasoning_content`。`model` 表示此次请求采用的配置模型。
+调用方必须在 system 中声明 JSON、提供实际业务结构与示例。客户端拒绝不包含 `json` 的 system。`data` 是未经业务 schema 验证的 JSON 对象；不会返回模型的 `reasoning_content`。`model` 表示此次请求采用的配置模型。可选 `providerModel` 保留提供方响应中的模型标签，仅在通过格式和凭据过滤时返回；它不构成对模型快照身份的独立证明。
+
+业务提示输入携带 `referenceable_evidence_ids`，与业务校验器共用同一个已知事实 ID 生成函数。unknown、不适用及重复引用均禁止进入事实引用数组；没有事实可引用的分析段落使用空数组并在 `uncertainties` 说明缺口。该约束不由传输客户端替代执行。
 
 `usage` 映射服务端实际返回的 `prompt_tokens`、`completion_tokens`、`total_tokens`；可选记录 `prompt_cache_hit_tokens` 和 `completion_tokens_details.reasoning_tokens`。缺失必需 token 计数会拒绝响应，不以零值伪造计费记录。缓存输入计数属于输入 token 的子集，reasoning token 属于相应服务端统计字段；不要重复相加计费。
 
@@ -50,8 +52,12 @@ const result = await client.completeJson({
 
 ## 测试与边界
 
-`node --test tests/deepseek.test.ts` 使用注入的 fake fetch；涵盖配置、请求形状、实际 usage 映射、缺 key、401、无重试、网络异常脱敏、请求和响应体超时、响应大小、截断及 JSON 拒绝。测试不调用真实 API，不安装依赖。
+`node --test tests/deepseek.test.ts` 的 16 项测试使用注入的 fake fetch；涵盖配置、请求形状、usage 映射、提供方模型标签过滤、缺 key、401、无重试、网络异常脱敏、请求和响应体超时、响应大小、截断及 JSON 拒绝。测试不调用真实 API，不安装依赖。
+
+2026-10-28 已用纯合成资料完成真实 API 重测：请求及提供方返回标签均为 `deepseek-flash`，思考配置为 `medium`。首轮 analysis 引用校验失败且未保留原始输出和用量；明确白名单提示契约后，第二轮两请求均通过，共 24,353 tokens。review 返回 `insufficient_evidence`，脚本显式选择合成候选继续测试 analysis，不能称为校盘成功。两个阶段的缓存重复均未新增请求。详细用量及原因不确定性见 [验证记录](VALIDATION.md)。
+
+当前 live 脚本在请求前限制 `attemptedRequests` 最多为 2，实时记录已取得的安全元数据，并把提供方响应与业务校验成功分开记录。该上限在成功重测后补充，已通过离线检查，没有为它额外重跑收费请求。未取得 usage 的失败不能当作零费用。
 
 服务层负责业务结构校验、上下文可见性、已锁定四柱不变、本地历法计算与 AI 候选比较的职责分离，以及输入长度、输出 token 上限、并发与缓存控制。实际用量来自提供方响应；当前没有金额级消费上限。生产流程只接受真实提供方结果，测试客户端仅在自动化测试中注入。不要把本客户端放入禁止联网的排盘 adapter。
 
-官方接口依据：[Chat Completion](https://api-docs.deepseek.com/api/create-chat-completion)、[JSON Output](https://api-docs.deepseek.com/guides/json_mode)、[Thinking Mode](https://api-docs.deepseek.com/guides/thinking_mode)。本次实现未执行真实 API 冒烟测试。
+官方接口依据：[Chat Completion](https://api-docs.deepseek.com/api/create-chat-completion)、[JSON Output](https://api-docs.deepseek.com/guides/json_mode)、[Thinking Mode](https://api-docs.deepseek.com/guides/thinking_mode)。接口验收通过不证明命理解释或预测有效。

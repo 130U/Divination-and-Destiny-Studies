@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { generateCandidateCharts, type BirthInput, type CandidateSet } from './chartEngine.ts';
 import { buildEvidence, getQuestionnaire, validateAnswers, type EvidenceItem, type QuestionnaireAnswers } from './questionnaire.ts';
 import { createDeepSeekClient, type DeepSeekResult } from './deepseek.ts';
-import { ANALYSIS_SYSTEM, REVIEW_SYSTEM, analysisPayload, reviewPayload, chartReferencePaths } from './prompts.ts';
+import { ANALYSIS_SYSTEM, REVIEW_SYSTEM, analysisPayload, reviewPayload, chartReferencePaths, referenceableEvidenceIds } from './prompts.ts';
 import { validateAnalysis, validateReview, type ChartReview, type PersonalAnalysis } from './results.ts';
 import { AppError, assertNoSecrets, exactKeys, freeze, record, runtime } from './runtime.ts';
 
@@ -10,6 +10,7 @@ export interface ModelEnvelope<T> {
   result: T;
   usage: DeepSeekResult['usage'];
   model: string;
+  providerModel?: string;
   requestId?: string;
   durationMs: number;
 }
@@ -100,7 +101,7 @@ export class Workflow {
       return structuredClone({ review, ...meta, cached: true });
     }
     if (session.reviewPending) throw new AppError('REVIEW_IN_PROGRESS', '这份资料正在校盘，请等待结果。', 409);
-    const knownIds = session.evidence.filter(item => item.informationStatus === 'known').map(item => item.id);
+    const knownIds = referenceableEvidenceIds(session.evidence);
     if (!knownIds.length) throw new AppError('INSUFFICIENT_EVIDENCE', '校盘问题尚无可用事实，暂不发起付费模型请求。可保留候选盘或补充已知经历。');
     const payload = reviewPayload(session.candidateSet, session.evidence, session.asOfDate);
     this.enterModel(); session.reviewPending = true;
@@ -126,7 +127,7 @@ export class Workflow {
     if (session.analysisPending) throw new AppError('ANALYSIS_IN_PROGRESS', '这份资料正在分析，请等待结果。', 409);
     const selectedBy = selectedId === review.recommended_candidate_id ? 'model' : 'user';
     const payload = analysisPayload(session.candidateSet, chart, review, session.evidence, session.context, selectedBy, session.asOfDate);
-    const knownIds = [...session.evidence, ...session.context].filter(item => item.informationStatus === 'known').map(item => item.id);
+    const knownIds = referenceableEvidenceIds([...session.evidence, ...session.context]);
     this.enterModel(); session.analysisPending = true;
     try {
       const { data, ...meta } = await this.client.completeJson({ system: ANALYSIS_SYSTEM, payload, maxOutputTokens: runtime.analysis_max_output_tokens });
