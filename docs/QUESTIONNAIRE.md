@@ -1,14 +1,14 @@
 # 问卷输入与证据边界
 
-本模块在任何 AI 请求之前收齐所有适用问题，再把回答分为校盘材料和分析背景。它不排候选盘、不计算命理分数、不判断出生时辰，也不调用外部服务。
+本模块把可选回答分为校盘材料和分析背景，在 AI 请求前将缺失内容记为 unknown 并校验已填写内容。27 道问题与 2 道适用性确认全部可留空；出生资料足以排盘时可以先出结果。它不排候选盘、不计算命理分数、不判断出生时辰，也不调用外部服务。
 
 ## 来源与本次调整
 
 问题设计经用户授权复用自 `130U/bazi-context-agent` 的 `configs/question_bank.v1.json`，源版本为 `1.1`。读取时旧仓库 HEAD 为 `b277fec462bada4c09ac651ed02a68d25ccd935d`；实际源文件 SHA-256 为 `a10cac9ad1928d702f81e3b71fcc8bcf51e5c025279192fcaab0aa3c50b135ff`。HEAD 只标识当时 checkout，源文件散列才标识本次复制的内容；不假设旧工作区文件等于该提交。旧仓库仅被读取。
 
-新题库版本为 `1.0.0`，完整出处记录在 JSON 的 `provenance`。保留 B、C、D 组的 27 个题目 ID、原题文字、选项 ID / 文字、事件类型、适用条件、数量和长度上限。出生 A 组由独立出生信息表单负责，不属于 `responses`。
+新题库版本为 `1.1.0`，完整出处记录在 JSON 的 `provenance`。保留 B、C、D 组的 27 个题目 ID、原题文字、选项 ID / 文字、事件类型、适用条件、数量和长度上限。出生 A 组由必填的独立出生信息表单负责，不属于 `responses`。
 
-旧题库的自适应提问、分数稳定后停止、锁盘后才收集背景等元策略不沿用。`sourceRequired: false` 记录原题设置；新的 `required: true` 表示每道适用题都必须明确回复，不表示必须披露实质内容。每题都能选择 `unknown` 或 `not_applicable`。原有“不确定”“情况复杂或不确定”等选项也保留。
+旧题库的自适应提问、分数稳定后停止、锁盘后才收集背景等元策略不沿用。`sourceRequired` 保留原题设置；当前问题和适用性确认均为 `required: false`。每题可留空，也能选择 `unknown` 或 `not_applicable`。原有“不确定”“情况复杂或不确定”等选项保留；缺失状态的默认规则来自题库 `responsePolicy`。
 
 | 部分 | 原阶段 | 内容 | 用途 |
 | --- | --- | --- | --- |
@@ -24,9 +24,11 @@
 
 每个题目至少包括 `id`、`label`、`type`、`stage`、`stageLabel`、`purpose`、`required` 和 `sourceRequired`。类型有 `single_choice`、`multi_choice`、`short_text`、`year_event_list`；模块亦支持单条 `year_event`，当前题库未使用它。选项统一为 `{ id, label }`，条件存放在 `condition`。事件输入框标签在 `eventFields`，统一回复状态在 `answerStatuses`。
 
-题库另有两道 `applicabilityQuestions`，用于明确 C7 工作经历、C8 子女或生育经历是否适用。它们的 UI 选项 ID 是字符串 `"true"`、`"false"`、`"unknown"`，提交时前两项需转换成布尔值。
+题库另有两道可选 `applicabilityQuestions`，用于明确 C7 工作经历、C8 子女或生育经历是否适用。它们的 UI 选项 ID 是字符串 `"true"`、`"false"`、`"unknown"`，提交时前两项需转换成布尔值；缺失记为 `unknown`。
 
 ## 提交格式
+
+`POST /api/session` 的 `answers` 可完全省略，也可为 `{}` 或包含部分 `responses` / `applicability` 的对象；不能用 null、数组等替代对象。以下类型描述规范化后的内部结构，不能理解为要求用户填写所有字段：
 
 ```ts
 type Answer =
@@ -52,7 +54,7 @@ interface QuestionnaireAnswers {
 
 单选 `value` 使用原选项 ID；多选使用无重复的 ID 数组；文本使用字符串；事件题使用事件数组。C9 必须为每条事件选择 `eventType: "best_year" | "worst_year"`。其他事件题可以省略 `eventType`；填写时必须与题目固定类型一致。
 
-以下只是单条回答片段，不是可提交的完整问卷：
+以下是部分回答片段；将其放入 `answers.responses` 即可提交，其余问题留空：
 
 ```json
 {
@@ -65,11 +67,13 @@ interface QuestionnaireAnswers {
 }
 ```
 
-条件为 `false` 时，可省略该条件对应的题目；若保留回答，只能是 `not_applicable`。条件为 `true` 或 `unknown` 时，仍须明确回复，可以回复 `unknown`。非条件题不能直接省略。已回答的职业身份若明确表明工作经历，则不能把工作适用性标成 `false`。这些依赖规则也定义在 JSON 中。
+条件为 `false` 时，缺失的对应题目规范化为 `not_applicable`；若主动填写，也只能是该状态。条件为 `true` 或 `unknown` 时，缺失回答规范化为 `unknown`。非条件题同样可省略。已回答的职业身份若明确表明工作经历，则不能把工作适用性标成 `false`。这些依赖规则也定义在 JSON 中。
 
-所有题都回复 `unknown` 在格式上是完整问卷；这不代表信息足以校盘。上层流程应在付费模型调用前检查校盘材料的信息量，并保留“信息不足”的出口。
+所有题留空或回复 `unknown` 均可继续两阶段 AI 流程，但不能据此声称找准时辰。单候选直接成为暂定工作盘；多候选弱证据时仍暂定选择并说明把握度有限。没有已知校盘或背景材料时，报告使用 `chart_only`；有已知材料时使用 `context_supported`。两者都不代表预测已验证，更不是概率。
 
 ## 严格校验
+
+公开流程先调用 `normalizeAnswers(answers?, birth?)` 补齐状态，再用下列 `validateAnswers` 校验规范化对象。`missingQuestionIds` 用于内部完整结构检查，不表示网页用户必须回答全部问题。无效的已填内容仍会被拒绝。
 
 ```ts
 validateAnswers(answers: unknown, birth?: {
@@ -97,13 +101,13 @@ validateAnswers(answers: unknown, birth?: {
 
 ## 结构化证据
 
-`buildEvidence(answers, birth?)` 先使用同一校验器，失败时抛出 `QuestionnaireValidationError`，其中 `issues` 提供结构化错误。有效输入返回 `{ evidence, context }`，每条包含：
+`buildEvidence(answers?, birth?)` 先规范化缺失状态并使用同一校验器，失败时抛出 `QuestionnaireValidationError`，其中 `issues` 提供结构化错误。有效输入返回 `{ evidence, context }`，每条包含：
 
 ```ts
 {
   id: string;                     // 原题目 ID，稳定引用
   label: string;                  // 原题目文字
-  answer: Answer;                 // 用户原始回复的独立副本
+  answer: Answer;                 // 已填回复的副本，或规范化后的缺失状态
   answerLabels?: string[];        // 单选/多选的原选项文字
   stage: "symbol_prior" | "event_backtest" | "context_box";
   purpose: "rectification_matching" | "contextual_analysis";
@@ -113,13 +117,13 @@ validateAnswers(answers: unknown, birth?: {
 }
 ```
 
-`informationStatus: "known"` 仅表示提供了实质回答，不表示该回答已经核实为真。旧选项中的 `unknown`、`complex_unknown`、`varies_unknown`、`prefer_not_to_say` 通过题库 `unknownOptionIds` 归为 `unknown`，同时保留原始选项 ID。条件为 false 且合法省略的题不生成虚构答案。
+`informationStatus: "known"` 仅表示提供了实质回答，不表示该回答已经核实为真。旧选项中的 `unknown`、`complex_unknown`、`varies_unknown`、`prefer_not_to_say` 通过题库 `unknownOptionIds` 归为 `unknown`，同时保留原始选项 ID。缺失题仍有明确的 unknown / not_applicable 状态记录，但没有虚构实质答案，不能引用为已知个人事实。
 
 模型可以用稳定 ID 说明支持与反证，但这些仍是本次选择工作盘所使用的材料。再次引用同一回答不能作为“选准了”的独立验证；若要评估效果，需要另行保留可靠出生时辰或未参与选择的独立经历。本模块不输出分数、概率或命中率。
 
 ## 验证范围
 
-`tests/questionnaire.test.ts` 使用纯合成数据检查完整性、条件适用、未知状态、字段拒绝、选项与长度边界、日期和年份、事件类型、重复事件、证据用途及副本隔离。测试不使用真实命例、不请求模型，也不能证明命理判断有效。
+`tests/questionnaire.test.ts` 使用纯合成数据检查可选输入、缺失规范化、内部完整性、条件适用、未知状态、字段拒绝、选项与长度边界、日期和年份、事件类型、重复事件、证据用途及副本隔离。测试不使用真实命例、不请求模型，也不能证明命理判断有效。
 
 ```sh
 node --test tests/questionnaire.test.ts
