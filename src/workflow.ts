@@ -1,4 +1,3 @@
-import { randomUUID } from 'node:crypto';
 import { generateCandidateCharts, type BirthInput, type CandidateSet } from './chartEngine.ts';
 import { buildEvidence, getQuestionnaire, normalizeAnswers, QuestionnaireValidationError, type EvidenceItem } from './questionnaire.ts';
 import { createDeepSeekClient, type DeepSeekResult } from './deepseek.ts';
@@ -15,7 +14,7 @@ export interface ModelEnvelope<T> {
   durationMs: number;
 }
 interface Session {
-  id: string; createdAt: string; expiresAt: string; expires: number; asOfDate: string; expiryTimer?: NodeJS.Timeout;
+  id: string; createdAt: string; expiresAt: string; expires: number; asOfDate: string; expiryTimer?: ReturnType<typeof setTimeout>;
   candidateSet: CandidateSet; evidence: EvidenceItem[]; context: EvidenceItem[];
   review?: ModelEnvelope<ChartReview>; reviewPending: boolean;
   analyses: Map<string, ModelEnvelope<PersonalAnalysis>>; analysisPending: boolean;
@@ -101,11 +100,12 @@ export class Workflow {
     const { evidence, context } = freeze(buildEvidence(answers, questionContext));
     const now = this.now(), expires = now + runtime.session_ttl_ms;
     const session: Session = {
-      id: randomUUID(), createdAt: new Date(now).toISOString(), expiresAt: new Date(expires).toISOString(), expires, asOfDate,
+      id: globalThis.crypto.randomUUID(), createdAt: new Date(now).toISOString(), expiresAt: new Date(expires).toISOString(), expires, asOfDate,
       candidateSet, evidence, context, reviewPending: false, analysisPending: false, analyses: new Map(),
     };
     this.sessions.set(session.id, session);
-    session.expiryTimer = setTimeout(() => this.delete(session.id), runtime.session_ttl_ms).unref();
+    session.expiryTimer = setTimeout(() => this.delete(session.id), runtime.session_ttl_ms);
+    session.expiryTimer.unref?.();
     return structuredClone({ id: session.id, createdAt: session.createdAt, expiresAt: session.expiresAt, asOfDate, candidateSet, evidence, context });
   }
 

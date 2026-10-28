@@ -55,7 +55,7 @@ export function createApp(options: AppOptions = {}) {
     try {
       checkOrigin(request);
       const url = new URL(request.url ?? '/', `http://${request.headers.host}`);
-      if (request.method === 'GET' && url.pathname === '/api/status') return send(response, 200, { app: 'Divination and Destiny Studies', version: '0.2.0', deepseek: status(), sessionTtlMinutes: runtime.session_ttl_ms / 60000, storage: 'memory_only', billing: 'server_operator_key', questionnaire: 'optional' });
+      if (request.method === 'GET' && url.pathname === '/api/status') return send(response, 200, { app: 'Divination and Destiny Studies', version: '0.3.0', deepseek: status(), sessionTtlMinutes: runtime.session_ttl_ms / 60000, storage: 'memory_only', billing: 'server_operator_key', questionnaire: 'optional' });
       if (request.method === 'GET' && url.pathname === '/api/questionnaire') return send(response, 200, getQuestionnaire());
       if (request.method === 'POST' && url.pathname === '/api/session') return send(response, 201, workflow.create(await readBody(request)));
       if (request.method === 'DELETE' && url.pathname === '/api/session') {

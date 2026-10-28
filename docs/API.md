@@ -1,6 +1,17 @@
-# 本地 API
+# API 与浏览器操作契约
 
-默认地址为 `http://127.0.0.1:3210`。写请求必须使用 `Content-Type: application/json`。只接受本机 Host；浏览器跨来源请求会被拒绝。API 不接收密钥、模型名、候选盘对象或任意上游 URL；这些由服务端配置和本地计算决定。
+0.3.0 提供两种运行方式，共享排盘、问卷、工作流和结果结构：
+
+| 模式 | 执行位置与凭据 | 操作传输 |
+| --- | --- | --- |
+| 静态在线版 | 浏览器运行，访客自己的 Key 仅保存在当前页内存 | `src/browser.ts` 的 adapter 直接调用内存工作流；AI 请求从浏览器直达 DeepSeek |
+| 本机 Node 版 | 本机 Node 运行，Key 由服务端环境提供 | 下列真实 HTTP API，默认 `http://127.0.0.1:3210` |
+
+浏览器 adapter 使用相同的 `/api/...` 操作名称和业务数据契约，但这些只是内存分派标识，**不是公开网页上的 HTTP 端点**。静态站点没有作者的模型代理后端，也不通过本机 Node API 处理访客资料。
+
+以下方法、HTTP 状态、Host 和 Content-Type 规则描述本机 Node 版。写请求必须使用 `Content-Type: application/json`；只接受本机 Host，浏览器跨来源请求会被拒绝。Node API 不接收密钥、模型名、候选盘对象或任意上游 URL；凭据由服务端配置，命盘由本地计算决定。
+
+浏览器版通过独立的 `setApiKey(value)` / `clearApiKey()` 管理凭据，不将 Key 放入业务请求体。设置 Key 需要安全上下文，不发起模型请求；Key 不写入 localStorage、sessionStorage、URL、日志或报告。更换或清除 Key 会清空当前会话与缓存，并取消本地等待；刷新或页面离开也会清空。AI 操作才会直连官方接口，费用计入访客账户。
 
 ## 接口一览
 
@@ -33,7 +44,7 @@
 
 这是合成输入示意，不是私人命例。日期为 `YYYY-MM-DD`；`calendar` 可为 `solar` / `lunar`，农历可加布尔 `leapMonth`。时间模式互斥：`exact` 只带 `time`；`range` 只带 `startTime/endTime`；`unknown` 不带时间字段。时间均为 `HH:mm`，范围必须同日且包含两端。性别为传统排运所需的 `male` / `female`。
 
-产品接受转换后的公历出生日期从 1900-01-01 到服务器评估当天。农历先由本地引擎转换，问卷中的事件日期统一按公历校验。无效日期、冲突时间字段、不存在的准确民用分钟、缺失参数和额外字段会被拒绝。
+产品接受转换后的公历出生日期从 1900-01-01 到运行环境评估当天。农历先由本地引擎转换，问卷中的事件日期统一按公历校验。无效日期、冲突时间字段、不存在的准确民用分钟、缺失参数和额外字段会被拒绝。
 
 `answers` 可省略，也可提交 `{}` 或部分回答。27 道问题和 2 道适用性确认全部可选；缺失值规范化为 `unknown`，已明确不适用的条件题记为 `not_applicable`。已填写内容仍须通过格式与日期校验。规范化后的内部结构如下：
 
@@ -53,7 +64,7 @@
 
 `YearEvent` 为 `{ year: number, description: string, date?: string, eventType?: string }`。只知道年份时不填精确日期。填写 C9 时必须指定 `best_year` 或 `worst_year`；其余题的事件类型由题库确定。适用条件为 false 的 C7/C8 可以省略或回复 `not_applicable`。详细选项与限制见 [问卷契约](QUESTIONNAIRE.md)。
 
-会话返回 `id`、`createdAt`、`expiresAt`、`asOfDate`、`candidateSet`、`evidence`、`context`。其中 `candidateSet` 包含出生输入、引擎版本、全部候选和警告。服务端保留冻结副本；修改返回对象不会修改后续分析所用资料。更正出生资料或答案需重新建立会话。
+会话返回 `id`、`createdAt`、`expiresAt`、`asOfDate`、`candidateSet`、`evidence`、`context`。其中 `candidateSet` 包含出生输入、引擎版本、全部候选和警告。工作流在对应运行环境保留冻结副本；修改返回对象不会修改后续分析所用资料。更正出生资料或答案需重新建立会话。
 
 ## 2. 一次比较全部候选
 
@@ -133,11 +144,11 @@ analysis: {
 
 ## 会话、费用与错误
 
-会话从创建起有效 30 分钟，评估日期 `asOfDate` 在创建时冻结，并作为 `as_of_date` 传给两次模型请求。服务端会按期限定时清理，重启也会清空。删除或过期后的会话返回 410；删除进行中的会话会使迟到结果丢弃，但不能保证撤回上游已收到的请求。
+会话从创建起有效 30 分钟，评估日期 `asOfDate` 在创建时冻结，并作为 `as_of_date` 传给两次模型请求。工作流按期清理；Node 重启会清空，浏览器刷新、更换或清除 Key、页面离开也会清空。Node 中删除或过期后的会话返回 410；浏览器 adapter 抛出对应业务错误。清除进行中的会话会丢弃迟到结果，但不能保证撤回上游已收到的请求。
 
-同一会话的成功校盘和同一候选的成功分析可缓存。并发重复调用被拒绝，服务端同时只运行一个模型请求。没有自动重试或失败后的模拟回退；网络异常、无效输出及手动重试仍可能产生提供方费用。
+同一会话的成功校盘和同一候选的成功分析可缓存。每个工作流实例拒绝并发模型调用：Node 进程共享其工作流，在线版每个标签页独立。没有自动重试或失败后的模拟回退；网络异常、无效输出及手动重试仍可能产生提供方费用。
 
-错误格式为 `{ "error": { "code": "...", "message": "...", "details": [] } }`，`details` 只在部分校验错误出现；提供方 HTTP 错误可能附带 `upstreamStatus`。已经取得完整提供方响应、但业务结构校验失败时，额外返回安全的 `error.modelAttempt: { stage, model, providerModel?, durationMs, usage }`，不回传原始模型正文。其 usage 仅是该次失败调用的用量；没有取得 usage 的失败不能当成零费用。常见状态如下：
+Node HTTP 错误格式为 `{ "error": { "code": "...", "message": "...", "details": [] } }`，`details` 只在部分校验错误出现；提供方 HTTP 错误可能附带 `upstreamStatus`。已经取得完整提供方响应、但业务结构校验失败时，额外返回安全的 `error.modelAttempt: { stage, model, providerModel?, durationMs, usage }`，不回传原始模型正文。浏览器 adapter 抛出业务错误供界面展示，沿用可用的安全 `modelAttempt` 元数据，不伪造 HTTP 响应。usage 仅是该次失败调用的用量；没有取得 usage 的失败不能当成零费用。Node 常见状态如下：
 
 | 状态 | 示例 | 含义 |
 | --- | --- | --- |
@@ -153,9 +164,13 @@ analysis: {
 
 当前默认预算见 [`configs/runtime.v1.json`](../configs/runtime.v1.json)：请求体 256 KiB、模型输入 JSON 100,000 字符、每次输出上限 8,192 tokens、最多 100 个内存会话。服务端不回传 API 密钥或原始提供方错误正文。
 
-`GET /api/status` 当前返回版本 `0.2.0`，并标记 `questionnaire: "optional"`、`billing: "server_operator_key"`。克隆后自行运行需要各自配置服务端 key；若共享同一个后端，请求使用运营者的 key。当前接口没有网页访客各自提供 key 的功能。
+当前状态版本为 `0.3.0`，两种模式均标记 `questionnaire: "optional"`。Node 为 `storage: "memory_only"`、`billing: "server_operator_key"`；浏览器 adapter 为 `storage: "browser_memory_only"`、`billing: "visitor_key"`。浏览器 `deepseek.verified` 只表示当前 Key 已取得过成功的客户端响应，设置 Key 不会验证余额，也不发起额外认证调用。
+
+在线版固定请求 `https://api.deepseek.com/chat/completions`，使用 `credentials: "omit"` 和 `referrerPolicy: "no-referrer"`。认证失败、余额不足、限流、网络或跨域错误会明确报告，不自动重试。Node 版若另行共享给别人，请求仍使用运营者的 Key；这不是当前静态在线版的架构。
 
 ## 已完成的合成验收
+
+以下是历史本机版本的验收，不能直接当作 0.3.0 公网部署或浏览器直连验收。对应版本的实际检查结果见 [验证记录](VALIDATION.md)。
 
 0.2.0 于 2026-10-28 完成真实浏览器验收：合成出生资料、27 题留空、单候选，两阶段均成功，4 节分析；review 为 4,656 tokens / 6,852 ms，analysis 为 11,053 tokens / 39,336 ms，合计 15,709 tokens。90 项离线测试通过。
 

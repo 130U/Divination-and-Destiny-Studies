@@ -1,6 +1,17 @@
 const $ = (id) => document.getElementById(id);
-const state = { questionnaire: null, questionControls: new Map(), applicability: new Map(), session: null, submitted: null, review: null, analysis: null, configured: false, busy: null, selection: '' };
+const browserRuntime = document.documentElement.dataset.runtime === 'browser';
+let browserAdapter = null;
+let browserAdapterPromise = null;
+const state = { questionnaire: null, questionControls: new Map(), applicability: new Map(), session: null, submitted: null, review: null, analysis: null, configured: false, busy: null, selection: '', lifecycle: 0, keyVerified: false, keyBusy: false };
 let eventSequence = 0;
+
+async function getBrowserAdapter() {
+  if (!browserAdapterPromise) browserAdapterPromise = import('./browser.js').then((adapter) => {
+    if (!['api', 'setApiKey', 'clearApiKey', 'status'].every((name) => typeof adapter[name] === 'function')) throw new Error('在线运行模块不完整，请重新加载页面。');
+    browserAdapter = adapter; return adapter;
+  }).catch(() => { throw new Error('在线运行模块未能加载，请重新加载页面。'); });
+  return browserAdapterPromise;
+}
 
 function element(tag, text, className) {
   const node = document.createElement(tag);
@@ -39,6 +50,7 @@ function reportWarnings(root, result) {
 }
 
 async function api(path, method = 'GET', body) {
+  if (browserRuntime) return (await getBrowserAdapter()).api(path, method, body);
   let response;
   try {
     response = await fetch(path, { method, headers: body ? { 'content-type': 'application/json' } : {},
@@ -50,6 +62,7 @@ async function api(path, method = 'GET', body) {
     const message = data?.error?.message || '请求未完成。';
     const details = Array.isArray(data?.error?.details) ? data.error.details.map((item) => item?.message).filter(Boolean).slice(0, 8) : [];
     const failure = new Error([message, ...details].join('\n'));
+    if (typeof data?.error?.code === 'string') failure.code = data.error.code;
     if (data?.error?.modelAttempt && typeof data.error.modelAttempt === 'object') failure.modelAttempt = data.error.modelAttempt;
     throw failure;
   }
@@ -57,18 +70,24 @@ async function api(path, method = 'GET', body) {
 }
 
 async function refreshStatus() {
+  const lifecycle = state.lifecycle;
   $('refresh-status').disabled = true;
   try {
     const result = await api('/api/status');
+    if (lifecycle !== state.lifecycle) return;
     state.configured = result.deepseek?.configured === true;
-    $('provider-status').textContent = state.configured ? `DeepSeek 已配置 · ${result.deepseek.model}` : 'DeepSeek 未配置 · 可先生成本地候选盘';
+    if (browserRuntime) {
+      state.keyVerified = state.configured && result.deepseek?.verified === true;
+      $('provider-status').textContent = state.configured ? `个人 Key ${state.keyVerified ? '已通过实际调用验证' : '已在本页配置 · 尚未验证'}` : '在线模式 · 尚未配置个人 Key';
+    } else $('provider-status').textContent = state.configured ? `DeepSeek 已配置 · ${result.deepseek.model}` : 'DeepSeek 未配置 · 可先生成本地候选盘';
     $('provider-status').classList.toggle('warning', !state.configured);
   } catch {
+    if (lifecycle !== state.lifecycle) return;
     state.configured = false;
     $('provider-status').textContent = '无法读取服务状态'; $('provider-status').classList.add('warning');
   } finally {
     $('refresh-status').disabled = false;
-    if (state.session && !state.review && !state.busy) stageStatus('review', 'info', state.configured ? '服务端模型已配置，点击按钮后才会发送资料并调用 AI。' : 'DeepSeek 尚未配置。你可以查看本地候选盘；服务端配置完成后点击页首“刷新”。');
+    if (lifecycle === state.lifecycle && state.session && !state.review && !state.busy) stageStatus('review', 'info', state.configured ? browserRuntime ? '你的 Key 已在本页配置。点击按钮后将直接调用 DeepSeek，费用由你的账户承担。' : '服务端模型已配置，点击按钮后才会发送资料并调用 AI。' : missingKeyMessage());
     updateActions();
   }
 }
@@ -77,18 +96,39 @@ function setBusy(kind) {
   $('clear-session').disabled = Boolean(kind); updateActions();
 }
 function updateActions() {
-  $('submit-intake').disabled = Boolean(state.busy) || !state.questionnaire;
+  $('submit-intake').disabled = Boolean(state.busy) || state.keyBusy || !state.questionnaire;
   $('submit-intake').firstChild.textContent = state.busy === 'session' ? '正在生成候选盘… ' : state.session ? '重新提交并生成候选盘 ' : '生成候选盘 ';
-  $('review-button').disabled = Boolean(state.busy) || !state.session || !state.configured || Boolean(state.review);
+  $('review-button').disabled = Boolean(state.busy) || state.keyBusy || !state.session || !state.configured || Boolean(state.review);
   $('review-button').textContent = state.busy === 'review' ? '正在校盘，请稍候…' : state.review ? 'AI 校盘已完成' : '开始 AI 校盘';
-  $('analysis-button').disabled = Boolean(state.busy) || !state.review || !state.selection || !state.configured || Boolean(state.analysis);
+  $('analysis-button').disabled = Boolean(state.busy) || state.keyBusy || !state.review || !state.selection || !state.configured || Boolean(state.analysis);
   $('analysis-button').textContent = state.busy === 'analysis' ? '正在分析，请稍候…' : state.analysis ? '深入分析已完成' : '生成深入分析';
   $('selected-candidate').disabled = Boolean(state.busy) || Boolean(state.analysis);
   $('download-json').disabled = Boolean(state.busy) || !state.review;
   $('download-markdown').disabled = Boolean(state.busy) || !state.review;
+  if (browserRuntime) {
+    $('save-browser-key').disabled = Boolean(state.busy) || state.keyBusy;
+    $('browser-api-key').disabled = Boolean(state.busy) || state.keyBusy;
+    $('clear-browser-key').disabled = state.keyBusy || (!state.configured && !state.session && !state.busy);
+  }
+}
+
+function missingKeyMessage() { return browserRuntime ? '尚未配置个人 Key。你可以先查看候选盘；在页首配置自己的 DeepSeek Key 后即可分析，不会自动发起收费检测。' : 'DeepSeek 尚未配置。你可以查看本地候选盘；服务端配置完成后点击页首“刷新”。'; }
+function keyStatus(kind, message) {
+  const target = $('browser-key-status'); target.dataset.state = kind;
+  target.setAttribute('role', kind === 'error' ? 'alert' : 'status'); target.textContent = message;
+}
+function resetIntake() { $('intake-form').reset(); if (state.questionnaire) renderQuestionnaire(state.questionnaire); updateBirthFields(); }
+async function clearBrowserCredentials(message = '本页 Key、临时会话和资料已清除。') {
+  if (!browserRuntime || state.keyBusy) return;
+  state.keyBusy = true; state.configured = false; state.keyVerified = false;
+  $('browser-api-key').value = ''; clearResults(); setBusy(null); resetIntake(); clearError(); announce('');
+  try { await (await getBrowserAdapter()).clearApiKey(); keyStatus('info', message); }
+  catch { keyStatus('error', '页面资料已清除，但运行模块未确认清理。请关闭此页以结束当前会话。'); }
+  finally { state.keyBusy = false; await refreshStatus(); updateActions(); }
 }
 
 function clearResults() {
+  state.lifecycle++;
   state.session = null; state.submitted = null; state.review = null; state.analysis = null; state.selection = '';
   for (const id of ['candidate-section', 'analysis-section', 'report-section']) $(id).hidden = true;
   for (const id of ['candidate-list', 'candidate-warnings', 'review-result', 'analysis-result']) $(id).replaceChildren();
@@ -105,7 +145,7 @@ function invalidateSession() {
   const id = state.session.id; clearResults();
   announce('资料已修改，旧候选盘和结果已失效。请完成修改后重新提交。');
   void deleteSession(id).then((deleted) => {
-    if (!deleted) showError('旧会话删除未确认，页面已阻止继续使用它；服务将按会话有效期清理。');
+    if (!deleted) showError(browserRuntime ? '旧会话清除未确认，页面已阻止继续使用它；可清除 Key 和本次资料后重新开始。' : '旧会话删除未确认，页面已阻止继续使用它；服务将按会话有效期清理。');
   });
 }
 
@@ -321,6 +361,8 @@ function usageText(result) {
     '\n以上仅为这一次模型调用的用量，不含其他阶段或此前失败、重试。';
 }
 function failedStageText(error) {
+  if (browserRuntime && ['NOT_CONFIGURED', 'KEY_CLEARED', 'KEY_CHANGED', 'REQUEST_CANCELLED'].includes(error?.code)) return '个人 Key 已清除或更换，这次请求不能继续。请重新配置 Key 并生成候选盘；已发送的请求仍可能产生账户费用。';
+  if (browserRuntime && ['SESSION_NOT_FOUND', 'SESSION_EXPIRED'].includes(error?.code)) return '本页临时会话已清除或过期。出生资料仍在表单中，请重新生成候选盘后继续。';
   if (error?.modelAttempt) return `模型已返回，但这次结果未通过格式校验。资料仍然保留，重试会产生新的调用。\n${errorText(error)}\n${usageText(error.modelAttempt)}`;
   return `${errorText(error)}\n资料和已有结果仍然保留。系统不会自动重试；你可以明确点击按钮再试一次，失败请求可能已产生模型用量。`;
 }
@@ -339,7 +381,7 @@ function renderCandidates() {
     const details = element('details'); details.append(element('summary', '查看本地排盘依据'), element('pre', JSON.stringify({ features: item.features, warnings: item.warnings }, null, 2)));
     card.append(topline, pillars, element('p', timeLabel.replaceAll('T', ' '), 'candidate-time'), details); list.append(card);
   }
-  if (!state.configured) stageStatus('review', 'info', 'DeepSeek 尚未配置。你可以查看本地候选盘；服务端配置完成后点击页首“刷新”。');
+  if (!state.configured) stageStatus('review', 'info', missingKeyMessage());
 }
 function renderReview(result) {
   const review = result.review, root = $('review-result'); root.replaceChildren();
@@ -398,37 +440,75 @@ $('intake-form').addEventListener('submit', async (event) => {
   if (!$('intake-form').reportValidity()) { announce('请核对必需的出生资料；已经填写一部分的经历，需要补全或移除。其余背景可以全部留空。'); return; }
   const submitted = { birth: birthData(), answers: answersData() }, previous = state.session?.id;
   clearResults(); setBusy('session'); announce('正在本地计算候选盘，不会调用 AI。');
+  const lifecycle = state.lifecycle;
   try {
     if (previous && !await deleteSession(previous)) throw new Error('旧会话删除未确认，请稍后再提交。');
-    const session = await api('/api/session', 'POST', submitted); state.session = session; state.submitted = submitted;
-    renderCandidates(); announce(`候选盘已生成。资料临时保存在服务内存中${session.expiresAt ? `，有效至 ${new Date(session.expiresAt).toLocaleString('zh-CN')}` : ''}。AI 尚未调用。`);
+    const session = await api('/api/session', 'POST', submitted); if (lifecycle !== state.lifecycle) return;
+    state.session = session; state.submitted = submitted;
+    renderCandidates(); announce(`候选盘已生成。资料临时保存在${browserRuntime ? '本页浏览器内存' : '服务内存'}中${session.expiresAt ? `，有效至 ${new Date(session.expiresAt).toLocaleString('zh-CN')}` : ''}。AI 尚未调用。`);
     $('candidate-section').scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' });
-  } catch (error) { showError(errorText(error)); announce('候选盘尚未生成，请核对资料后重试。'); }
-  finally { setBusy(null); }
+  } catch (error) { if (lifecycle === state.lifecycle) { showError(errorText(error)); announce('候选盘尚未生成，请核对资料后重试。'); } }
+  finally { if (lifecycle === state.lifecycle) setBusy(null); }
 });
 
 $('review-button').addEventListener('click', async () => {
   if (state.busy || !state.session || state.review || !state.configured) return;
+  const lifecycle = state.lifecycle, sessionId = state.session.id;
   clearError(); announce(''); setBusy('review'); stageStatus('review', 'pending', '正在请求 DeepSeek 比较候选盘。资料已保留，请稍候，无需重复提交。');
-  try { const result = await api('/api/review', 'POST', { sessionId: state.session.id }); state.review = result; renderReview(result); }
-  catch (error) { stageStatus('review', 'error', failedStageText(error)); }
-  finally { setBusy(null); }
+  try {
+    const result = await api('/api/review', 'POST', { sessionId }); if (lifecycle !== state.lifecycle) return;
+    state.review = result; renderReview(result); if (browserRuntime) { await refreshStatus(); if (lifecycle === state.lifecycle) keyStatus('success', '个人 Key 已通过实际模型调用验证。本页继续使用此 Key；每次新调用由你的 DeepSeek 账户承担费用。'); }
+  } catch (error) { if (lifecycle === state.lifecycle) { stageStatus('review', 'error', failedStageText(error)); if (browserRuntime) { await refreshStatus(); if (lifecycle === state.lifecycle && state.keyVerified) keyStatus('info', '个人 Key 已通过实际 API 响应验证；本次报告的处理状态请查看校盘区。'); } } }
+  finally { if (lifecycle === state.lifecycle) setBusy(null); }
 });
 $('selected-candidate').addEventListener('change', () => { if (state.analysis || state.busy) return; state.selection = $('selected-candidate').value; highlightSelection(); updateActions(); });
 $('analysis-button').addEventListener('click', async () => {
   if (state.busy || !state.session || !state.review || !state.selection || state.analysis || !state.configured) return;
+  const lifecycle = state.lifecycle, sessionId = state.session.id, candidateId = state.selection;
   clearError(); announce(''); setBusy('analysis'); stageStatus('analysis', 'pending', '正在请求 DeepSeek 分析工作盘与已提供的背景。资料已保留，请稍候。');
-  try { const result = await api('/api/analysis', 'POST', { sessionId: state.session.id, candidateId: state.selection }); state.analysis = result; renderAnalysis(result); }
-  catch (error) { stageStatus('analysis', 'error', failedStageText(error)); }
-  finally { setBusy(null); }
+  try {
+    const result = await api('/api/analysis', 'POST', { sessionId, candidateId }); if (lifecycle !== state.lifecycle) return;
+    state.analysis = result; renderAnalysis(result); if (browserRuntime) { await refreshStatus(); if (lifecycle === state.lifecycle) keyStatus('success', '个人 Key 已通过实际模型调用验证。请下载需要保留的报告；离开页面会清除 Key 和临时会话。'); }
+  } catch (error) { if (lifecycle === state.lifecycle) { stageStatus('analysis', 'error', failedStageText(error)); if (browserRuntime) { await refreshStatus(); if (lifecycle === state.lifecycle && state.keyVerified) keyStatus('info', '个人 Key 已通过实际 API 响应验证；本次报告的处理状态请查看分析区。'); } } }
+  finally { if (lifecycle === state.lifecycle) setBusy(null); }
 });
 $('clear-session').addEventListener('click', async () => {
   if (state.busy) return;
+  if (browserRuntime) { await clearBrowserCredentials(); return; }
   const id = state.session?.id; clearResults(); $('intake-form').reset(); clearError(); if (state.questionnaire) renderQuestionnaire(state.questionnaire); updateBirthFields();
   announce('页面中的本次资料已清除。');
   if (!await deleteSession(id)) showError('页面资料已清除，但服务会话删除未确认；服务将按有效期清理。');
 });
 $('refresh-status').addEventListener('click', refreshStatus);
+
+$('browser-key-form').addEventListener('submit', async (event) => {
+  event.preventDefault(); if (!browserRuntime || state.busy || state.keyBusy) return;
+  let key = $('browser-api-key').value; $('browser-api-key').value = '';
+  if (!key.trim() || /[\r\n]/.test(key) || key.length > 512) { key = ''; keyStatus('error', '请输入非空的个人 API Key，不能包含换行且长度不得超过 512 字符。输入框已清空，请重新输入。'); return; }
+  key = key.trim(); state.keyBusy = true; updateActions();
+  let lifecycle = state.lifecycle;
+  try {
+    const adapter = await getBrowserAdapter();
+    if (lifecycle !== state.lifecycle) return;
+    adapter.setApiKey(key); key = '';
+    clearResults(); lifecycle = state.lifecycle; state.keyVerified = false; clearError(); announce('');
+    keyStatus('info', 'Key 已仅保存在本页内存，尚未连接验证，也未发起收费调用。出生资料和问卷仍在表单中，请生成候选盘后继续。');
+    await refreshStatus();
+  } catch (error) { if (lifecycle === state.lifecycle) keyStatus('error', ['INVALID_KEY', 'HTTPS_REQUIRED'].includes(error?.code) ? error.message : 'Key 未能配置。输入框已清空；请重新加载在线模块后再试。'); }
+  finally { key = ''; if (lifecycle === state.lifecycle) { state.keyBusy = false; updateActions(); } }
+});
+$('clear-browser-key').addEventListener('click', () => clearBrowserCredentials('Key、临时会话和资料已清除，正在等待的请求已取消。先前已发送的请求仍可能产生费用。'));
+if (browserRuntime) {
+  $('browser-key-panel').hidden = false;
+  document.querySelector('.privacy-note').textContent = '资料与个人 Key 仅保存在本页内存。AI 请求直接发送至 DeepSeek 官方 API，费用由你的账户承担。';
+  $('clear-session').textContent = '清除 Key 和本次资料';
+  window.addEventListener('pagehide', () => {
+    $('browser-api-key').value = ''; state.configured = false; state.keyVerified = false; state.keyBusy = false;
+    try { browserAdapter?.clearApiKey(); } catch { /* Page teardown never logs credential state. */ }
+    clearResults(); setBusy(null); resetIntake(); keyStatus('info', '本页 Key 与临时会话已清除；如需继续，请重新配置。');
+    $('provider-status').textContent = '在线模式 · 尚未配置个人 Key'; $('provider-status').classList.add('warning');
+  });
+}
 
 const menuButton = $('menu-toggle');
 function closeMenu() { menuButton.setAttribute('aria-expanded', 'false'); $('work-navigation').classList.remove('is-open'); }
@@ -472,4 +552,4 @@ $('download-markdown').addEventListener('click', () => download('markdown'));
 
 updateBirthFields();
 void refreshStatus();
-api('/api/questionnaire').then(renderQuestionnaire).catch((error) => { $('questionnaire-content').replaceChildren(element('p', '问卷未能加载，请确认本地服务正常后刷新页面。', 'muted')); showError(errorText(error)); });
+api('/api/questionnaire').then(renderQuestionnaire).catch((error) => { $('questionnaire-content').replaceChildren(element('p', browserRuntime ? '问卷未能加载，请重新加载在线页面。' : '问卷未能加载，请确认本地服务正常后刷新页面。', 'muted')); showError(errorText(error)); });

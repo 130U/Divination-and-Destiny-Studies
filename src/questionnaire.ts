@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import questionBank from '../configs/question_bank.v1.json' with { type: 'json' };
 
 export type QuestionStage = "symbol_prior" | "event_backtest" | "context_box";
 export type QuestionPurpose = "rectification_matching" | "contextual_analysis";
@@ -101,7 +101,7 @@ export interface EvidenceItem {
 }
 export interface EvidenceBundle { evidence: EvidenceItem[]; context: EvidenceItem[] }
 
-const bank = JSON.parse(readFileSync(new URL("../configs/question_bank.v1.json", import.meta.url), "utf8")) as Questionnaire;
+const bank = structuredClone(questionBank) as Questionnaire;
 const questions = bank.sections.flatMap((section) => section.questions);
 const questionMap = new Map(questions.map((question) => [question.id, question]));
 const conditionMap = new Map(bank.applicabilityQuestions.map((question) => [question.id, question]));

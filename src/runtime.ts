@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import runtimeConfig from '../configs/runtime.v1.json' with { type: 'json' };
 import type { DeepSeekUsage } from './deepseek.ts';
 
 export interface ModelAttempt {
@@ -9,7 +9,7 @@ export interface ModelAttempt {
   durationMs: number;
 }
 
-export const runtime = Object.freeze(JSON.parse(readFileSync(new URL('../configs/runtime.v1.json', import.meta.url), 'utf8')) as {
+export const runtime = Object.freeze({ ...runtimeConfig } as {
   version: string; session_ttl_ms: number; max_sessions: number; max_request_bytes: number;
   max_prompt_characters: number; review_max_output_tokens: number; analysis_max_output_tokens: number;
   max_concurrent_model_calls: number;

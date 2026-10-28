@@ -25,6 +25,18 @@
     </aside>
     <div class="main-column">
       <div class="intro"><p class="eyebrow">Divination and Destiny Studies</p><h1>从出生资料，<br>开始这次分析。</h1><p>填写出生资料，即可生成候选盘并继续 AI 校盘与分析。经历和现实背景可以稍后补充；信息越具体，分析越能结合你的处境。</p><a class="intro-link" href="#birth-section">填写出生资料 <span aria-hidden="true">↗</span></a></div>
+      <section id="browser-key-panel" class="panel browser-key-panel" hidden>
+        <div class="section-heading"><span class="step-number">在线模式 / BYOK</span><div><h2>使用你的 Key</h2><p>每位访客使用自己的 DeepSeek 账户。</p></div></div>
+        <div class="browser-key-content">
+          <p id="browser-key-help" class="key-description">排盘与问卷在本页浏览器内运行，没有作者后端。点击 AI 按钮时，你的 Key 和相关资料直接发往 DeepSeek 官方 API，费用由你的账户承担。</p>
+          <form id="browser-key-form" autocomplete="off" novalidate>
+            <div class="field"><label for="browser-api-key">你的 DeepSeek API Key</label><input id="browser-api-key" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" aria-describedby="browser-key-help browser-key-memory" placeholder="仅在本页使用，不会保存到设备"></div>
+            <div class="key-actions"><button id="save-browser-key" class="button primary" type="submit">在本页使用此 Key</button><button id="clear-browser-key" class="text-button" type="button" disabled>清除 Key 和本次资料</button></div>
+          </form>
+          <p id="browser-key-memory" class="question-help">配置不会发起收费检测。Key 只保留在本页内存中，不进入网址、浏览器存储、日志或报告；输入后立即清空输入框。离开页面或清除时，密钥与临时会话一并清除。</p>
+          <p id="browser-key-status" class="key-status" role="status" aria-live="polite">尚未配置 Key；你仍可先填写资料并生成本地候选盘。</p>
+        </div>
+      </section>
       <div id="status-message" class="notice" role="status" aria-live="polite" aria-atomic="true" hidden></div>
       <div id="error-message" class="notice error" role="alert" tabindex="-1" hidden></div>
       <form id="intake-form" novalidate>

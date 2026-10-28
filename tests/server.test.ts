@@ -86,7 +86,7 @@ test('localhost server rejects cross-site writes, invalid content, and private f
   try {
     const status = await fetch(app.base + '/api/status'); assert.equal(status.status, 200);
     const statusData = await status.json() as { version: string; billing: string; questionnaire: string };
-    assert.equal(statusData.version, '0.2.0');
+    assert.equal(statusData.version, '0.3.0');
     assert.equal(statusData.billing, 'server_operator_key');
     assert.equal(statusData.questionnaire, 'optional');
     assert.equal(status.headers.get('cache-control'), 'no-store');

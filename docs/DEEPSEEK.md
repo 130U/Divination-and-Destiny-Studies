@@ -1,8 +1,16 @@
-# DeepSeek 服务端 JSON 客户端
+# DeepSeek JSON 客户端与两种凭据模式
 
-本模块使用 Node.js 24 原生 `fetch`，没有 SDK 或新增依赖。它只负责请求与传输校验；业务端仍须验证返回数据的 schema、证据引用和已锁定四柱。传输成功不代表命理判断得到验证。
+`src/deepseek.ts` 使用原生 `fetch`，同一个客户端可以在 Node.js 24 或浏览器运行，不需要模型 SDK。它负责请求与传输校验；工作流仍须验证必要正文、候选身份及引用。传输成功不代表命理判断得到验证。
 
-## 服务端配置
+## 在线版：访客自己的 Key
+
+静态在线版由 `src/browser.ts` 在当前标签页创建工作流。Key 由访客在 HTTPS 页面输入，只保存在闭包内存；不写入 localStorage、sessionStorage、URL、日志、构建文件或导出报告。更换、清除、刷新或页面离开时清空 Key 与会话；清除时取消本地等待，不保留迟到结果，但不能保证撤回官方已经收到的请求或费用。
+
+设置 Key 本身不调用模型。点击 AI 操作时，浏览器才直连固定的 `https://api.deepseek.com/chat/completions`，Key 只作为官方请求认证凭据使用；不经过作者的后端，不使用作者账户。费用计入访客的 DeepSeek 账户。浏览器 fetch 设置 `credentials: "omit"` 和 `referrerPolicy: "no-referrer"`，不允许自定义 endpoint 或跟随跳转。
+
+在线版使用 `deepseek-flash` + `medium`。状态 `configured` 只说明已经设置 Key，`verified` 说明当前 Key 已取得过成功的客户端响应；两者都不保证剩余额度或后续请求成功。认证、余额、限流、网络或浏览器跨域错误会明确报告，不自动重试，也不切换到作者的代理服务。
+
+## 本机 Node 版：服务端配置
 
 | 环境变量 | 含义 |
 |---|---|
@@ -22,9 +30,9 @@
 | `max` | `max` | `max` |
 | `disabled` | 不发送 | 关闭思考 |
 
-没有 key 时返回 `NOT_CONFIGURED`，不会以 mock 冒充真实结果。`getDeepSeekStatus()` 仅返回 `configured`、`provider`、`model`，不表示已成功连接或账户有余额。无效模型标识时状态使用安全默认模型名称且 `configured=false`，实际调用明确拒绝配置。
+没有 key 时返回 `NOT_CONFIGURED`，不会以 mock 冒充真实结果。`getDeepSeekStatus()` 仅返回 `configured`、`provider`、`model`，不表示已成功连接或账户有余额；在线 adapter 另维护上文的 `verified`。无效模型标识时状态使用安全默认模型名称且 `configured=false`，实际调用明确拒绝配置。
 
-凭据由服务端进程环境读取，可通过启动时加载的本地 `.env` 或进程环境变量配置。克隆源码的人需自行配置自己的 key，发布源码不会共享作者额度；共享后端的请求则使用运营者配置的 key。当前没有网页访客各自提供 key 的功能。测试通过 `options.env` 注入明确的假凭据，不会读取或使用真实凭据。
+Node 模式的凭据由进程环境读取，可通过启动时加载的本地 `.env` 或环境变量配置；默认环境读取在浏览器中返回空对象，在线版由 adapter 显式传入访客 Key。克隆源码自行运行的人使用自己的配置；若另行共享 Node 后端，请求使用运营者的 Key。这与当前静态在线版的访客直连模式不同。测试通过 `options.env` 注入假凭据，不读取真实凭据。
 
 ## 调用契约
 
@@ -53,6 +61,8 @@ const result = await client.completeJson({
 仅接受 `finish_reason="stop"`。空答案、截断、其他 finish_reason、无效 JSON、非对象 JSON、缺失 usage 均拒绝。HTTP、网络、超时错误使用静态安全消息，不附带原始响应、请求 payload、密钥或原异常 cause。业务数据可能包含个人信息，调用方仍须在发送前最小化字段，在展示或记录前作业务级脱敏。
 
 ## 测试与边界
+
+下面 0.2.0 和 0.1.0 记录是历史本机版本的合成验收，不能当作 0.3.0 公网部署或浏览器直连的验证。当前版本实际检查结果以 [验证记录](VALIDATION.md) 为准。
 
 `node --test tests/deepseek.test.ts` 使用注入的 fake fetch；涵盖配置、请求形状、usage 映射、提供方模型标签过滤、缺 key、401、无重试、网络异常脱敏、请求和响应体超时、响应大小、截断及 JSON 拒绝。测试不调用真实 API，不安装依赖。
 

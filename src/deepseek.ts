@@ -73,7 +73,11 @@ function modelFrom(env: DeepSeekEnvironment): string | undefined {
     (!env.DEEPSEEK_API_KEY?.trim() || !model.includes(env.DEEPSEEK_API_KEY.trim())) ? model : undefined;
 }
 
-export function getDeepSeekStatus(env: DeepSeekEnvironment = process.env): {
+function defaultEnvironment(): DeepSeekEnvironment {
+  return typeof process !== 'undefined' && process.versions?.node ? process.env : {};
+}
+
+export function getDeepSeekStatus(env: DeepSeekEnvironment = defaultEnvironment()): {
   configured: boolean; provider: "deepseek"; model: string;
 } {
   const model = modelFrom(env);
@@ -139,7 +143,7 @@ async function readBoundedJson(response: Response, maxBytes: number): Promise<un
 export function createDeepSeekClient(options: DeepSeekOptions = {}): { completeJson(request: DeepSeekRequest): Promise<DeepSeekResult> } {
   return {
     async completeJson(request): Promise<DeepSeekResult> {
-      const env = options.env ?? process.env;
+      const env = options.env ?? defaultEnvironment();
       const apiKey = env.DEEPSEEK_API_KEY?.trim();
       if (!apiKey) throw new DeepSeekError("NOT_CONFIGURED");
       const model = modelFrom(env);

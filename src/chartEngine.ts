@@ -1,5 +1,5 @@
-import { createHash } from "node:crypto";
-import { createRequire } from "node:module";
+import { sha256Hex } from './sha256.ts';
+import { LocalPaipan, TrueSolarTimeCalculator, type LocalPaipanInstance } from './zhenyi.ts';
 
 export interface BirthInput {
   date: string;
@@ -39,40 +39,6 @@ export class ChartInputError extends Error {
     this.name = "ChartInputError";
   }
 }
-
-interface UpstreamInfo {
-  big_tg?: number[];
-  big_dz?: number[];
-  big_start_time?: number[][];
-  qiyun_virtual_age?: number;
-  qiyun_source_days?: number;
-  qiyun_method?: string;
-  jiaoyun_desc?: string;
-  start_time?: number[];
-}
-
-interface LocalPaipanInstance {
-  ctg: string[];
-  cdz: string[];
-  cwx: string[];
-  dzwx: number[];
-  dzcg: number[][];
-  GetGanZhi(year: number, month: number, day: number, hour: number, minute: number, second: number): [number[], number[], number, number[], number] | [];
-  GetInfo(sex: number, year: number, month: number, day: number, hour: number, minute: number, second: number): UpstreamInfo;
-  GetTenGod(dayStem: number, otherStem: number): { char: string };
-  Lunar2Solar(year: number, month: number, day: number, leap: number): number[] | false;
-  GetLeap(year: number): number;
-  GetLunarDays(year: number, month: number, leap: number): number;
-  naYin(stem: number, branch: number): unknown[];
-}
-
-const require = createRequire(import.meta.url);
-const { LocalPaipan } = require("../vendor/zhenyi/core/LocalPaipan.js") as { LocalPaipan: new () => LocalPaipanInstance };
-const { TrueSolarTimeCalculator } = require("../vendor/zhenyi/core/TrueSolarTimeCalculator.js") as {
-  TrueSolarTimeCalculator: {
-    calculate(date: string, time: string, longitude: number, timezone: number): { parts: number[] };
-  };
-};
 
 export const ZHENYI_ENGINE = Object.freeze({
   name: "ZHENYI-ORG/Zhenyi-bazi",
@@ -276,7 +242,7 @@ export function generateCandidateCharts(input: BirthInput): CandidateSet {
       const representative: Representative = { civilTime, utcTime: new Date(instant.epoch).toISOString(), utcOffsetMinutes: instant.offsetMs / MINUTE_MS, effectiveTime: clockText(effectiveParts), solarTermTime: clockText(solarTermParts) + "+08:00", effectiveParts, solarTermParts, stems, branches };
       let group = groups.get(key);
       if (!group) {
-        group = { chart: { id: "chart-" + createHash("sha256").update(key).digest("hex").slice(0, 16), pillars, dayMaster: at(engine.ctg, stems[2]), civilTimes: [], features: {}, warnings: [] }, representative, alternatives: [], instantCount: 0 };
+        group = { chart: { id: "chart-" + sha256Hex(key).slice(0, 16), pillars, dayMaster: at(engine.ctg, stems[2]), civilTimes: [], features: {}, warnings: [] }, representative, alternatives: [], instantCount: 0 };
         groups.set(key, group);
       }
       if (group.chart.civilTimes[group.chart.civilTimes.length - 1] !== civilTime) group.chart.civilTimes.push(civilTime);
