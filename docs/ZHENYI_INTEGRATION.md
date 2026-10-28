@@ -1,63 +1,70 @@
-# Zhenyi 本地排盘集成
+# Zhenyi Local Chart Integration
 
-本项目使用真实的本地日期转四柱计算，保留所有符合输入时间范围的不同四柱，再由上层在问卷完成后比较证据。排盘模块没有模型调用、API key、命理打分或候选优劣预筛。AI 给出的后续工作盘建议不等于出生时辰已被客观证实。
+This project performs actual local date-to-Four-Pillars calculations and retains every distinct chart consistent with the supplied time range. The application then compares evidence from submitted, normalized questionnaire answers. The chart module makes no model calls, accesses no API keys, applies no divination scores, and does not prefilter candidates by perceived quality. A subsequent AI recommendation of a working chart does not establish the birth time as an objective fact.
 
-## 固定来源与许可
+## Pinned Source and License
 
-上游：`ZHENYI-ORG/Zhenyi-bazi`，固定提交 [`383a726437a81db2b87eed517ef5e6ccd30b7bd4`](https://github.com/ZHENYI-ORG/Zhenyi-bazi/tree/383a726437a81db2b87eed517ef5e6ccd30b7bd4)。以下文件原样保存在 `vendor/zhenyi`：
+Upstream: `ZHENYI-ORG/Zhenyi-bazi`, pinned to commit [`383a726437a81db2b87eed517ef5e6ccd30b7bd4`](https://github.com/ZHENYI-ORG/Zhenyi-bazi/tree/383a726437a81db2b87eed517ef5e6ccd30b7bd4). The following files are preserved unchanged in `vendor/zhenyi`:
 
-| 原始文件 | 本地用途 |
+| Original file | Local purpose |
 |---|---|
-| `dist/core/LocalPaipan.js` | 公农历、节气、四柱、藏干、十神、纳音、起运与大运 |
-| `dist/core/TrueSolarTimeCalculator.js` | 使用上游经度与均时差校正计算 |
-| `dist/data/nayin.json` | 纳音数据 |
-| `dist/data/eot.json` | 按月日查询的均时差表 |
-| `LICENSE` | MIT 原版权及许可文本 |
+| `dist/core/LocalPaipan.js` | Gregorian/lunar calendars, solar terms, Four Pillars, hidden stems, Ten Gods, Na Yin element designations, and the start and sequence of luck cycles |
+| `dist/core/TrueSolarTimeCalculator.js` | Upstream longitude and equation-of-time corrections |
+| `dist/data/nayin.json` | Na Yin data: traditional element designations associated with stem-branch pairs |
+| `dist/data/eot.json` | Equation-of-time table indexed by month and day |
+| `LICENSE` | Original MIT copyright and license text |
 
-`vendor/zhenyi/SOURCE_MANIFEST.json` 记录原路径、固定来源链接、字节长度、SHA256 和上游 Git blob SHA1；集成测试同时核对两种摘要。五个文件均未修改；本地另加 `package.json` 将 vendor 目录声明为 CommonJS，以及该 manifest。应用本身为 Node 24 ESM + TypeScript，不需要额外运行时依赖。没有复制上游 UI、商业后端、地区数据库、图标、AI Prompt、完整盲派判盘引擎或案例文件。MIT 文本随被复制的代码保留；此记录不是对上游所有材料权利链的独立认证。
+`vendor/zhenyi/SOURCE_MANIFEST.json` records original paths, pinned source links, byte lengths, SHA256 hashes, and upstream Git blob SHA1 hashes. Integration tests check both digests. All five files are unmodified. The local integration adds `package.json` to declare the vendor directory as CommonJS, plus the manifest. The application uses Node 24 ESM and TypeScript; its shared browser integration and dependency setup are described in [Architecture](ARCHITECTURE.md). No upstream UI, commercial backend, regional database, icons, AI prompts, complete blind-school judgment engine, or case files were copied. The MIT text is retained with the copied code; this record is not an independent certification of the rights to all upstream material.
 
-## 输入与候选覆盖
+## Inputs and Candidate Coverage
 
-入口为 `generateCandidateCharts(input: BirthInput): CandidateSet`，定义见 `src/chartEngine.ts`。输入必须显式给出日历类型、性别、IANA 时区、经度、是否采用真太阳时，不能用默认性别、UTC+8、正午或系统时区补齐。公历及农历日期支持输入年 1600—2200；农历闰月和公历日期会先校验。算法支持范围不等于已经对该区间每一天做过独立历法认证。
+The entry point is `generateCandidateCharts(input: BirthInput): CandidateSet`, defined in `src/chartEngine.ts`. Inputs must explicitly specify calendar type, sex, IANA time zone, longitude, and whether to use true solar time. Missing values cannot be filled with a default sex, UTC+8, noon, or the system time zone. Gregorian and lunar inputs support years 1600–2200; lunar leap months and Gregorian dates are validated first. Algorithmic support does not mean that every date in this range has received independent calendar certification.
 
-输入只能包含 BirthInput 定义的字段，未知字段、数组或非普通对象会拒绝。时间字段按模式互斥：exact 只允许 time，range 只允许 startTime/endTime，unknown 不允许任何时间字段；调用方应省略不用的字段，而不是提交空字符串或 undefined。这样不会把额外 metadata 随 input 回显。
+Only fields defined by BirthInput are accepted. Unknown fields, arrays, and non-plain objects are rejected. Time fields are mutually exclusive by mode: exact permits only time, range permits only startTime/endTime, and unknown permits no time fields. Callers should omit unused fields rather than submit empty strings or undefined. This also prevents extra metadata from being echoed through input.
 
-- `exact`：严格接收 `HH:mm`，按该民用分钟的第 0 秒解释，不接受秒数或 24:00。
-- `range`：同一输入日期的起止分钟，包含两端；跨日范围明确拒绝，需由调用方分别建立日期候选集。
-- `unknown`：逐分钟枚举 00:00—23:59，不只取十二个时辰中点。这样可保留分钟精度下的子时、节气和真太阳时跨日结构差异。
-- 仅按年/月/日/时四柱完全相同合并，保留 `civilTimes`。每个 ID 由四柱稳定派生，不代表优先级、置信度或概率。返回顺序是首次出现的时间顺序。
+- `exact`: accepts strict `HH:mm`, interpreted at second 0 of that civil minute; seconds and 24:00 are rejected.
+- `range`: start and end minutes on the same input date, inclusive. Cross-date ranges are explicitly rejected; callers must create separate candidate sets for each date.
+- `unknown`: enumerates every minute from 00:00–23:59, rather than only the midpoints of the twelve traditional two-hour periods. This retains minute-level structural differences around the Zi period, solar terms, and true-solar-time date changes.
+- Candidates are merged only when all four year/month/day/hour pillars match exactly, retaining `civilTimes`. Each ID is derived deterministically from the four pillars and represents no priority, confidence, or probability. Results follow the chronological order of first occurrence.
 
-时区解释由宿主 Node 的 Intl/ICU 时区数据库提供。模块先在周边 UTC 区间逐分钟收集偏移，再对每个目标民用分钟反向验证所有 UTC 解释。跳时分钟不会被移到另一个钟点：准确时间若不存在则报错；范围中的缺口会跳过并明确警告；整天被跳过会报错。重复分钟保留全部解释；如果四柱相同，在 `features.ambiguousTimeAlternatives` 保留各 UTC 时刻，如果真太阳时使四柱不同则返回不同候选。不会静默采用上游计算器的“重复时刻取较早一次”策略。
+In Node, time-zone interpretation uses the host's Intl/ICU time-zone database. The module first collects offsets minute by minute across a surrounding UTC interval, then validates every UTC interpretation of each target civil minute. A nonexistent minute is not moved to another clock time: an exact input in a gap raises an error; gaps within a range are skipped with an explicit warning; a fully skipped day raises an error. Repeated minutes retain all interpretations. If their pillars match, every UTC instant is retained in `features.ambiguousTimeAlternatives`; if true solar time produces different pillars, separate candidates are returned. The wrapper does not silently adopt the upstream calculator's choice of the earlier repeated instant.
 
-## 规则口径与保留信息
+## Rule Profile and Retained Information
 
-保留真一的 0 点换日、23:00—24:00 夜子时本日日柱与独立时干、立春分年、节令分月、盲派虚岁起运与纳音交运。**时间坐标采用本项目明确版本化的分离时钟策略，不原样沿用上游整盘使用有效墙钟的入口。** `ruleProfile` 为 `zhenyi-blind-00h-split-zi-absolute-jieqi-utc8-local-dayhour-v2-minute`。
+The integration retains Zhenyi's day change at hour 0 (midnight); its late-Zi treatment from 23:00–24:00, using the current day's pillar and a separately derived hour stem; the year boundary at Lichun (Start of Spring); month boundaries at the relevant solar terms; and blind-school conventions for nominal-age luck-cycle starts and Na Yin-based transitions. **Time coordinates follow this project's explicitly versioned split-clock policy, rather than the upstream entry point's use of one effective wall clock for the whole chart.** The `ruleProfile` is `zhenyi-blind-00h-split-zi-absolute-jieqi-utc8-local-dayhour-v2-minute`.
 
-原因是上游 [GetAdjustedJQ](https://github.com/ZHENYI-ORG/Zhenyi-bazi/blob/383a726437a81db2b87eed517ef5e6ccd30b7bd4/dist/core/LocalPaipan.js#L162-L178) 明确给节气 Julian date 加上 1/3 日，即固定 UTC+8；直接拿纽约或真太阳墙钟比较会移动真实节气边界。因此本项目对每个真实 UTC 候选分别计算：
+The reason is that upstream [GetAdjustedJQ](https://github.com/ZHENYI-ORG/Zhenyi-bazi/blob/383a726437a81db2b87eed517ef5e6ccd30b7bd4/dist/core/LocalPaipan.js#L162-L178) explicitly adds 1/3 of a day to solar-term Julian dates, placing them at fixed UTC+8. Comparing these directly with New York or true-solar wall time would move the actual solar-term boundary. The wrapper therefore calculates each real UTC candidate as follows:
 
-1. 年/月：将绝对时刻转为固定 UTC+8，与上游节气表处于同一坐标，只取此次 GetGanZhi 的年、月。
-2. 日/时：使用用户明确选定的当地民用钟或经度/均时差修正后的真太阳钟，只取该次计算的日、时。
-3. 起运和大运：使用同一个固定 UTC+8 代表时点计算，避免从错误的月柱起运。`qiyun.referenceTimeBasis` 和交运 `startTime` 的 +08:00 后缀明确记录该口径。
+1. Year/month: convert the absolute instant to fixed UTC+8, matching the upstream solar-term table's coordinates, and retain only the year and month from this GetGanZhi call.
+2. Day/hour: use the explicitly selected local civil clock or the true-solar clock corrected for longitude and the equation of time, retaining only the day and hour from this calculation.
+3. Luck-cycle start and sequence: calculate from the same representative instant expressed at fixed UTC+8, avoiding a start based on the wrong month pillar. `qiyun.referenceTimeBasis` and the +08:00 suffix on transition `startTime` explicitly record this convention.
 
-由此，经度或真太阳开关不会移动全球同时发生的节气；日/时仍可因地方时间而不同。这是软件采用的明确规则选择，不声称所有术数流派都采用同一规则。原始 vendor 文件没有改动，坐标分离仅发生在本地 wrapper。
+Consequently, longitude and the true-solar-time setting do not shift a solar term that occurs simultaneously worldwide; day and hour pillars can still differ with local time. This is an explicit software rule choice, not a claim that every divination school follows the same convention. The original vendor files remain unchanged; coordinate separation occurs only in the local wrapper.
 
-真太阳时校正使用未修改的上游计算器，以 UTC 零偏移取得经度/均时差结果，再减去每个实际时区解释的偏移。这层包装保留 DST 双解及历史秒级时区偏移；不使用其自动选择较早 DST 时刻的入口。均时差来自上游月日表，不是按出生年份逐秒计算的太阳历表。候选枚举精度为一分钟，不能保证覆盖仅在一分钟内短暂存在的结构，也不能解释为秒级出生时间认证。
+True-solar-time correction uses the unchanged upstream calculator with a zero UTC offset to obtain the longitude/equation-of-time result, then subtracts the offset for each actual time-zone interpretation. This wrapper preserves both DST interpretations and historical offsets with second-level components; it does not use the entry point that automatically selects the earlier DST instant. The equation of time comes from the upstream month/day table, not a solar ephemeris calculated second by second for the birth year. Candidate enumeration has one-minute resolution. It cannot guarantee coverage of structures that exist only briefly within a minute, and is not a certification of birth time to the second.
 
-每个候选的 `features` 包含：
+Each candidate's `features` includes:
 
-- `hiddenStems`、`tenGods`、`nayin` 和 `fiveElements`。五行值只是明干加地支主五行的无权计数，不是旺衰得分。藏干保留 `principal` 与底层 `upstreamOrder`；底层藏干顺序与上游展示适配器的中气/余气顺序并不总相同，因此没有将数组次序伪装为强度等级。
-- `luckCycles` 的 12 步大运：柱、起止虚岁、起止公历年份、固定 UTC+8 的交运时点、干支各五年的口径；起止年份是该十年阶段的粗粒度标签，不能把它们当作精确 UTC 区间。
-- `qiyun` 的方法、来源天数、虚岁与纳音交运说明。
-- `representative` 的民用时间、UTC、偏移、日时有效计算时间和年/月使用的 `solarTermTime`；`timeBasis/solarTermTimeBasis/solarDate` 与时区元数据；发生重复时刻时的所有解释。
+- `hiddenStems`, `tenGods`, `nayin`, and `fiveElements`. The Five Elements values are unweighted counts of visible stems and the branches' principal elements, not strength scores. Hidden stems retain `principal` and the underlying `upstreamOrder`. This order does not always match the secondary/residual-stem ordering in the upstream display adapter, so array order is not presented as a strength ranking.
+- The 12 major luck cycles in `luckCycles`: each pillar, starting and ending nominal ages, starting and ending Gregorian years, the transition instant at fixed UTC+8, and the convention assigning five years each to its stem and branch. Start/end years are coarse labels for the ten-year phase, not precise UTC intervals.
+- The `qiyun` method, source day count, nominal age, and explanation of the Na Yin transition convention. Qiyun denotes the start of the major luck-cycle sequence; nominal age is the traditional age-counting convention used upstream.
+- The `representative` civil time, UTC instant, offset, effective day/hour calculation time, and year/month `solarTermTime`; `timeBasis/solarTermTimeBasis/solarDate` and time-zone metadata; and all interpretations of a repeated civil time.
 
-**合并相同四柱不代表起运时刻相同。** 起运和大运按组内第一个有效分钟及其时区解释计算，`luckCyclesRepresentative.exactForAllGroupedMinutes=false`，多分钟组附带警告。上层如果需要按某个重大事件日精确判断交运，应对相关候选分钟分别重算，不能直接把代表值当整组精确值。
+**Matching four pillars do not imply matching luck-cycle start instants.** The start and cycle sequence are calculated from the first valid minute and its time-zone interpretation in each group. `luckCyclesRepresentative.exactForAllGroupedMinutes=false`, and groups containing multiple minutes carry a warning. An application that needs an exact transition comparison against a dated life event must recalculate the relevant candidate minutes separately, rather than treating the representative value as exact for the whole group.
 
-`LocalPaipan.GetInfo` 内部仍计算上游的描述性五行加权值，因为 vendor 文件保持原样；本项目不暴露、不读取它们来筛选候选，也不调用完整 `BlindJudgmentEngine` 的主功、路径分数、最终断语或未来应期推演。
+`LocalPaipan.GetInfo` still computes upstream descriptive, weighted Five Elements values internally because the vendor file remains unchanged. This project neither exposes nor reads those values to filter candidates. It also does not invoke the complete `BlindJudgmentEngine` for principal-function judgments, path scores, final interpretations, or future event-timing projections.
 
-## 验证范围
+## Validation Scope
 
-`node --test tests/chartEngine.test.ts` 使用合成输入和上游公开示例，覆盖固定四柱、早晚子时、全天 1440 分钟、小时及立春节气边界、公农历/闰月、真太阳时跨日、缺失/未知/冲突字段、DST 跳时/重复、Apia 跳日、重复运行稳定、输入不变与 vendor 原始文件完整性。测试不使用真实用户信息、不调用模型、也不联网。
+`node --test tests/chartEngine.test.ts` uses synthetic inputs and public upstream examples. It covers fixed pillar fixtures, early and late Zi periods, all 1440 minutes of a day, hour and Lichun boundaries, Gregorian/lunar dates and leap months, true-solar-time date changes, missing/unknown/conflicting fields, DST gaps and repeated times, Apia's skipped date, repeatability, unchanged inputs, and original vendor-file integrity. Tests use no real user information, call no models, and make no network requests.
 
-独立节气 fixture 来自 [香港天文台 2026 年二月月历](https://www.hko.gov.hk/tc/gts/astron2026/files/2026cal02.pdf) 与 [日本国立天文台 2026 历要项](https://eco.mtk.nao.ac.jp/koyomi/yoko/2026/rekiyou262.html)：立春为 2 月 4 日 04:02 HKT / 05:02 JST，惊蛰为 3 月 5 日 22:59 JST。测试取公布分钟前后两分钟，检查纽约跨前一民用日的立春、惊蛰月份变化、同一 UTC 时刻跨时区年/月一致，以及真太阳经度校正不移动节气。这是独立天文日期边界检查，不使用上游函数生成测试期望。
+Independent solar-term fixtures come from the [Hong Kong Observatory's February 2026 calendar](https://www.hko.gov.hk/tc/gts/astron2026/files/2026cal02.pdf) and the [National Astronomical Observatory of Japan's 2026 calendar tables](https://eco.mtk.nao.ac.jp/koyomi/yoko/2026/rekiyou262.html):
 
-这些测试证明列出的软件行为与固定口径一致，不证明八字、出生时辰反推或人生事件预测的真实性和准确率。完整历史时区认证、秒级时间不确定性、全支持年份天文精度认证及各流派交叉验证仍未完成。
+| Solar term | Date (month/day) | Published time |
+| --- | --- | --- |
+| Lichun (Start of Spring) | 2/4 | 04:02 HKT / 05:02 JST |
+| Jingzhe (Awakening of Insects) | 3/5 | 22:59 JST |
+
+Tests use instants two minutes before and after the published minute to check Lichun falling on the previous civil date in New York, the Jingzhe month change, consistent year/month pillars for the same UTC instant across time zones, and solar-term invariance under true-solar longitude correction. These are independent astronomical date-boundary checks; expected results are not generated by the upstream functions.
+
+The tests establish consistency of the listed software behaviors with the pinned rule profile. They do not establish the truth or accuracy of BaZi, birth-time inference, or life-event predictions. Comprehensive historical time-zone certification, second-level time uncertainty, astronomical-accuracy certification across all supported years, and cross-school validation remain incomplete.

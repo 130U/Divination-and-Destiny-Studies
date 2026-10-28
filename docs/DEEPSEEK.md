@@ -1,40 +1,40 @@
-# DeepSeek JSON 客户端与两种凭据模式
+# DeepSeek JSON Client and Credential Modes
 
-`src/deepseek.ts` 使用原生 `fetch`，同一个客户端可以在 Node.js 24 或浏览器运行，不需要模型 SDK。它负责请求与传输校验；工作流仍须验证必要正文、候选身份及引用。传输成功不代表命理判断得到验证。
+`src/deepseek.ts` uses native `fetch`. The same client runs in Node.js 24 or a browser without a model SDK. It handles requests and transport validation; the workflow must still validate essential report text, candidate identities, and references. A successful request does not validate a BaZi interpretation.
 
-## 在线版：访客自己的 Key
+## Online mode: each visitor supplies a key
 
-静态在线版由 `src/browser.ts` 在当前标签页创建工作流。Key 由访客在 HTTPS 页面输入，只保存在闭包内存；不写入 localStorage、sessionStorage、URL、日志、构建文件或导出报告。更换、清除、刷新或页面离开时清空 Key 与会话；清除时取消本地等待，不保留迟到结果，但不能保证撤回官方已经收到的请求或费用。
+In the static online app, `src/browser.ts` creates a workflow in the current tab. Visitors enter their key on an HTTPS page. The key stays in closure memory and is never written to localStorage, sessionStorage, URLs, logs, build files, or exported reports. Replacing or clearing the key, refreshing, or leaving the page clears both the key and sessions. Clearing cancels local waiting and discards late results, but cannot guarantee cancellation of requests or charges already received by the provider.
 
-设置 Key 本身不调用模型。点击 AI 操作时，浏览器才直连固定的 `https://api.deepseek.com/chat/completions`，Key 只作为官方请求认证凭据使用；不经过作者的后端，不使用作者账户。费用计入访客的 DeepSeek 账户。浏览器 fetch 设置 `credentials: "omit"` 和 `referrerPolicy: "no-referrer"`，不允许自定义 endpoint 或跟随跳转。
+Setting a key does not call the model. Only an explicit AI action sends a request directly from the browser to the fixed endpoint, `https://api.deepseek.com/chat/completions`. The key is used solely to authenticate that official API request. Requests do not pass through the author's backend or use the author's account; charges accrue to the visitor's DeepSeek account. Browser fetch uses `credentials: "omit"` and `referrerPolicy: "no-referrer"`. Custom endpoints and redirects are not allowed.
 
-在线版使用 `deepseek-flash` + `medium`。状态 `configured` 只说明已经设置 Key，`verified` 说明当前 Key 已取得过成功的客户端响应；两者都不保证剩余额度或后续请求成功。认证、余额、限流、网络或浏览器跨域错误会明确报告，不自动重试，也不切换到作者的代理服务。
+Online mode uses `deepseek-flash` + `medium`. The `configured` status means only that a key has been set. `verified` means the current key has received a successful client response. Neither guarantees a remaining balance or success on subsequent requests. Authentication, balance, rate-limit, network, and browser CORS errors are reported explicitly. The app does not retry automatically or switch to an author-operated proxy.
 
-## 本机 Node 版：服务端配置
+## Local Node mode: server configuration
 
-| 环境变量 | 含义 |
+| Environment variable | Purpose |
 |---|---|
-| `DEEPSEEK_API_KEY` | 仅在运行服务端的进程环境中配置；不得提交、发送到浏览器、记录到日志或写入请求 payload |
-| `DEEPSEEK_MODEL` | 默认 `deepseek-flash`；允许以 `deepseek-` 开头的模型标识，服务方最终判断模型是否可用 |
-| `DEEPSEEK_THINKING` | `medium`（默认）；支持 `low`、`medium`、`high`、`max`、`disabled` |
+| `DEEPSEEK_API_KEY` | Configure only in the server process environment. Never commit it, send it to the browser, log it, or include it in a request payload. |
+| `DEEPSEEK_MODEL` | Defaults to `deepseek-flash`. Model identifiers beginning with `deepseek-` are accepted; the provider ultimately determines whether a model is available. |
+| `DEEPSEEK_THINKING` | Defaults to `medium`. Supports `low`, `medium`, `high`, `max`, and `disabled`. |
 
-默认组合为 `deepseek-flash` + `medium`。截至 2026-10-28，[官方模型页](https://api-docs.deepseek.com/)说明 `deepseek-flash` 当前由 **DeepSeek-V4.1-Flash-1017** 提供服务。该名称是服务端别名，可能随官方升级改变，不能将配置名当成永久固定的模型版本或自行拼造快照模型 ID。
+The default combination is `deepseek-flash` + `medium`. As of 2026-10-28, the [official model documentation](https://api-docs.deepseek.com/) states that `deepseek-flash` is served by **DeepSeek-V4.1-Flash-1017**. This is a provider-managed alias and may change with an upstream upgrade. Do not treat the configured name as a permanently pinned model version or invent a snapshot model ID.
 
-`medium` 按请求值原样发送。[官方思考强度映射](https://api-docs.deepseek.com/guides/thinking_mode/)将请求的 `medium` 映射为实际 `high`；本项目不预先改写为 `high`，也不降级为 `low`。支持的四档启用值与关闭方式如下：
+The client sends `medium` unchanged. The [official reasoning-effort mapping](https://api-docs.deepseek.com/guides/thinking_mode/) maps a requested value of `medium` to an effective level of `high`. This project does not rewrite the request to `high` or downgrade it to `low`. The four enabled levels and the disabled setting behave as follows:
 
-| 本地配置 | 请求中的 `reasoning_effort` | 官方当前实际强度 |
+| Local setting | Requested `reasoning_effort` | Current effective level documented by the provider |
 | --- | --- | --- |
 | `low` | `low` | `low` |
-| `medium`（默认） | `medium` | `high` |
+| `medium` (default) | `medium` | `high` |
 | `high` | `high` | `high` |
 | `max` | `max` | `max` |
-| `disabled` | 不发送 | 关闭思考 |
+| `disabled` | Not sent | Thinking disabled |
 
-没有 key 时返回 `NOT_CONFIGURED`，不会以 mock 冒充真实结果。`getDeepSeekStatus()` 仅返回 `configured`、`provider`、`model`，不表示已成功连接或账户有余额；在线 adapter 另维护上文的 `verified`。无效模型标识时状态使用安全默认模型名称且 `configured=false`，实际调用明确拒绝配置。
+A missing key produces `NOT_CONFIGURED`; a mock response is never substituted for a real result. `getDeepSeekStatus()` returns only `configured`, `provider`, and `model`. It does not establish connectivity or account balance. The online adapter separately maintains `verified`, as described above. If the model identifier is invalid, status uses a safe default model name with `configured=false`, and an actual call explicitly rejects the configuration.
 
-Node 模式的凭据由进程环境读取，可通过启动时加载的本地 `.env` 或环境变量配置；默认环境读取在浏览器中返回空对象，在线版由 adapter 显式传入访客 Key。克隆源码自行运行的人使用自己的配置；若另行共享 Node 后端，请求使用运营者的 Key。这与当前静态在线版的访客直连模式不同。测试通过 `options.env` 注入假凭据，不读取真实凭据。
+Node mode reads credentials from the process environment, populated either directly or through a local `.env` file loaded at startup. The default environment reader returns an empty object in the browser; the online adapter explicitly supplies the visitor's key. People who clone and run the source use their own configuration. If someone separately shares a Node backend, requests use that operator's key. This differs from the current static online app, where each visitor calls the provider directly. Tests inject fake credentials through `options.env` and do not read real credentials.
 
-## 调用契约
+## Client contract
 
 ```ts
 const client = createDeepSeekClient();
@@ -46,34 +46,34 @@ const result = await client.completeJson({
 // result: { data, usage, model, providerModel?, requestId?, durationMs }
 ```
 
-调用方必须在 system 中声明 JSON、提供实际业务结构与示例。客户端拒绝不包含 `json` 的 system。`data` 是未经业务 schema 验证的 JSON 对象；不会返回模型的 `reasoning_content`。`model` 表示此次请求采用的配置模型。可选 `providerModel` 保留提供方响应中的模型标签，仅在通过格式和凭据过滤时返回；它不构成对模型快照身份的独立证明。
+The caller must request JSON in `system` and provide the actual business structure and an example. The client rejects a system prompt that does not contain `json`. `data` is a JSON object that has not yet passed business-schema validation. The client does not return the model's `reasoning_content`. `model` identifies the configured model used for the request. The optional `providerModel` preserves the provider's response label only if it passes format and credential filtering; it is not independent proof of a particular model snapshot.
 
-业务提示输入携带 `referenceable_evidence_ids`，与业务校验器共用已知回答 ID 生成函数。unknown 和不适用项不能作为事实引用。业务层可规范化轻微引用格式、去重或移除不可用 ID，并在 `reportWarnings` 说明，保留正文；候选身份错误或缺少必要正文仍失败。背景全部留空时允许 `chart_only` 分析，不伪造经历。传输客户端不替代这些业务检查。
+Business prompt inputs include `referenceable_evidence_ids`, generated by the same function that supplies known-answer IDs to the business validator. Unknown and not-applicable answers cannot be cited as facts. The business layer may normalize minor reference-format issues, deduplicate IDs, or remove unavailable IDs while retaining report text and recording the changes in `reportWarnings`. Candidate-identity errors or missing essential text still cause failure. Entirely blank background answers permit `chart_only` analysis without inventing life events. The transport client does not replace these business checks.
 
-`usage` 映射服务端实际返回的 `prompt_tokens`、`completion_tokens`、`total_tokens`；可选记录 `prompt_cache_hit_tokens` 和 `completion_tokens_details.reasoning_tokens`。缺失必需 token 计数会拒绝响应，不以零值伪造计费记录。缓存输入计数属于输入 token 的子集，reasoning token 属于相应服务端统计字段；不要重复相加计费。
+`usage` maps the provider's actual `prompt_tokens`, `completion_tokens`, and `total_tokens`. It optionally records `prompt_cache_hit_tokens` and `completion_tokens_details.reasoning_tokens`. Responses missing required token counts are rejected rather than assigned fabricated zero-cost records. Cached input tokens are a subset of input tokens, and reasoning tokens belong to the corresponding provider accounting field; do not add them again when calculating charges.
 
-页面与导出的 usage 只代表对应的该次模型调用，不含其他阶段、此前失败或重试，不是账户累计账单。缓存返回原调用用量，此次不会新增模型请求。完整提供方响应若在业务校验失败，API 的 `error.modelAttempt` 仍保留安全的 `stage`、`model`、可选 `providerModel`、`durationMs` 和 `usage`；没有取得 usage 的失败不能当成零费用。系统不自动付费重试。
+Usage shown on the page or in an export describes only the associated model call. It excludes other stages, earlier failures, and retries, and is not a cumulative account bill. A cached result retains the original call's usage and does not make another model request. If a completed provider response fails business validation, the API's `error.modelAttempt` still preserves safe `stage`, `model`, optional `providerModel`, `durationMs`, and `usage` metadata. A failure without available usage must not be treated as free. The system never retries a paid request automatically.
 
-默认总超时 120 秒、响应上限 1 MiB、客户端输出预算 4096 tokens；单次请求允许调低/调高预算，但固定上限为 8192。业务流程仍为一次校盘和一次分析，两次分别显式使用 8192 tokens 上限；调整思考强度不会自动扩大预算。`timeoutMs` 覆盖接收响应头和读取响应体；`maxResponseBytes` 同时检查 Content-Length 与实际累计字节。服务层可以设置更小限制。客户端没有自动重试；失败请求仍可能已产生服务方费用，不可把 timeout 当成免费取消。
+Defaults are a 120-second total timeout, a 1 MiB response limit, and a client output budget of 4096 tokens. A request may lower or raise the budget, up to a fixed ceiling of 8192. The business workflow still consists of one chart review and one analysis; each explicitly uses an 8192-token output limit. Changing the thinking level does not automatically increase that budget. `timeoutMs` covers both response headers and body consumption. `maxResponseBytes` checks both Content-Length and the actual accumulated bytes. The service layer may impose smaller limits. The client does not retry automatically. Failed requests may still incur provider charges; a timeout is not a guarantee of free cancellation.
 
-固定 endpoint：`https://api.deepseek.com/chat/completions`，禁止跳转，不接受用户输入的 endpoint。JSON 模式使用 `response_format: {type: "json_object"}`；`low/medium/high/max` 均发送 `thinking: {type: "enabled"}`，并将所选值原样发送为 `reasoning_effort`。默认请求因此包含 `reasoning_effort: "medium"`。`disabled` 使用 `thinking: {type: "disabled"}`，不发送 effort；所有模式都不发送 temperature。
+The endpoint is fixed at `https://api.deepseek.com/chat/completions`. Redirects and user-supplied endpoints are prohibited. JSON mode uses `response_format: {type: "json_object"}`. The `low/medium/high/max` settings all send `thinking: {type: "enabled"}` and pass the selected value unchanged as `reasoning_effort`. The default request therefore includes `reasoning_effort: "medium"`. `disabled` sends `thinking: {type: "disabled"}` and omits the effort parameter. No mode sends temperature.
 
-仅接受 `finish_reason="stop"`。空答案、截断、其他 finish_reason、无效 JSON、非对象 JSON、缺失 usage 均拒绝。HTTP、网络、超时错误使用静态安全消息，不附带原始响应、请求 payload、密钥或原异常 cause。业务数据可能包含个人信息，调用方仍须在发送前最小化字段，在展示或记录前作业务级脱敏。
+Only `finish_reason="stop"` is accepted. Empty answers, truncation, other finish reasons, invalid JSON, non-object JSON, and missing usage are rejected. HTTP, network, and timeout errors use static, safe messages without raw responses, request payloads, keys, or the original exception cause. Business data may contain personal information. Callers must still minimize fields before sending them and apply business-level redaction before display or logging.
 
-## 测试与边界
+## Tests and limits
 
-下面 0.2.0 和 0.1.0 记录是历史本机版本的合成验收，不能当作 0.3.0 公网部署或浏览器直连的验证。当前版本实际检查结果以 [验证记录](VALIDATION.md) 为准。
+The 0.2.0 and 0.1.0 records below are historical acceptance checks of local versions using synthetic inputs. They do not validate the 0.3.0 public deployment or direct browser requests. Consult the [validation record](VALIDATION.md) for checks actually performed on the current version.
 
-`node --test tests/deepseek.test.ts` 使用注入的 fake fetch；涵盖配置、请求形状、usage 映射、提供方模型标签过滤、缺 key、401、无重试、网络异常脱敏、请求和响应体超时、响应大小、截断及 JSON 拒绝。测试不调用真实 API，不安装依赖。
+`node --test tests/deepseek.test.ts` uses injected fake fetch implementations. It covers configuration, request shape, usage mapping, provider-model label filtering, missing keys, 401 responses, absence of retries, network-error redaction, request and body timeouts, response size, truncation, and JSON rejection. These tests neither call the real API nor install dependencies.
 
-0.2.0 在 2026-10-28 完成真实浏览器合成验收：27 题留空、单候选、默认 `deepseek-flash` + `medium`，两阶段成功并返回 4 节分析。review 为 4,656 tokens / 6,852 ms，analysis 为 11,053 tokens / 39,336 ms，合计 15,709 tokens；90 项离线测试通过。
+Version 0.2.0 completed live browser acceptance with synthetic inputs on 2026-10-28: all 27 questions were blank, there was one candidate, and the default was `deepseek-flash` + `medium`. Both stages succeeded and returned four analysis sections. Review used 4,656 tokens / 6,852 ms; analysis used 11,053 tokens / 39,336 ms, for a total of 15,709 tokens. All 90 offline tests passed.
 
-同日 0.1.0 历史验收的首轮 analysis 引用校验失败，未保留原始输出和用量；第二轮两请求均通过，共 24,353 tokens。该轮 review 为 `insufficient_evidence`，脚本显式选取合成候选继续分析，缓存重复未新增请求。这是独立的历史样例，不能与 0.2.0 用量混算，也不能称为校盘成功。模型请求名或返回标签不能独立确认实际快照。详见 [验证记录](VALIDATION.md)。
+In the historical 0.1.0 check on the same date, the first analysis failed reference validation; its raw output and usage were not retained. Both requests in the second run passed, totaling 24,353 tokens. That run's review returned `insufficient_evidence`; the script explicitly selected a synthetic candidate to continue analysis. Repeating the cached operation made no additional request. This is a separate historical example: its usage must not be combined with the 0.2.0 figures, and it must not be described as successful birth-time rectification. A requested model name or returned label cannot independently establish the actual snapshot. See the [validation record](VALIDATION.md).
 
-当前 live 脚本在请求前限制 `attemptedRequests` 最多为 2，实时记录已取得的安全元数据，并把提供方响应与业务校验成功分开记录。浏览器验收与独立 live 脚本是不同执行记录；未取得 usage 的失败不能当作零费用。
+The current live script limits `attemptedRequests` to at most 2 before sending requests, records available safe metadata as execution proceeds, and distinguishes a provider response from successful business validation. Browser acceptance and the standalone live script are separate execution records. Failures without available usage must not be treated as free.
 
-可用 `npm run test:live -- --birth-only --single-candidate` 选择背景留空、准确分钟的单候选合成输入，仍保留两次请求上限。0.2.0 已记录的真实验收来自浏览器，未将该 CLI 参数组合标为另行完成的真实调用。
+Use `npm run test:live -- --birth-only --single-candidate` to select synthetic input with blank background answers and one candidate at an exact minute. The two-request limit still applies. The recorded 0.2.0 live acceptance was performed in the browser; this CLI argument combination is not marked as a separately completed live run.
 
-服务层负责业务结构校验、上下文可见性、已锁定四柱不变、本地历法计算与 AI 候选比较的职责分离，以及输入长度、输出 token 上限、并发与缓存控制。实际用量来自提供方响应；当前没有金额级消费上限。生产流程只接受真实提供方结果，测试客户端仅在自动化测试中注入。不要把本客户端放入禁止联网的排盘 adapter。
+The service layer is responsible for business-structure validation, context visibility, preserving fixed pillars, separating local calendar calculation from AI candidate comparison, and controlling input length, output-token limits, concurrency, and caching. Actual usage comes from provider responses; there is currently no monetary spending cap. Production workflows accept only real provider results. Test clients are injected only in automated tests. Do not place this client inside a calendar adapter that prohibits network access.
 
-官方接口依据：[Chat Completion](https://api-docs.deepseek.com/api/create-chat-completion)、[JSON Output](https://api-docs.deepseek.com/guides/json_mode)、[Thinking Mode](https://api-docs.deepseek.com/guides/thinking_mode)。接口验收通过不证明命理解释或预测有效。
+Official references: [Chat Completion](https://api-docs.deepseek.com/api/create-chat-completion), [JSON Output](https://api-docs.deepseek.com/guides/json_mode), and [Thinking Mode](https://api-docs.deepseek.com/guides/thinking_mode). Passing interface acceptance checks does not establish the validity of BaZi interpretations or predictions.

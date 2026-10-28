@@ -1,120 +1,120 @@
-# 交付验证记录
+# Delivery Validation Record
 
-验证日期：2026-10-28。以下记录只覆盖当前工程实现，不证明八字定时辰或未来预测的有效性。
+Validation date: 2026-10-28. These records cover the engineering implementation only. They do not establish the validity of BaZi birth-time rectification or future predictions.
 
-## 0.3.0 在线 BYOK 验证
+## 0.3.0 Online BYOK Validation
 
-2026-10-28，新增纯浏览器运行模式，与本机版共用历法、问卷、模型提示和报告校验。
+On 2026-10-28, a browser-only runtime was added, sharing the calendar engine, questionnaire, model prompts, and report validation with the local application.
 
-- `npm run check`：103 项测试通过（原 90 项 + 6 项浏览器兼容核心 + 4 项浏览器运行时测试 + 3 项 Key 提交生命周期测试），类型检查和 5 份 vendor 完整性检查通过。受限环境首次阻止了 5 项 HTTP 测试的 loopback 连接；允许本机连接后完整检查通过。
-- `npm run build:web` 和 `node --check public/app.js` 通过。静态发布包只包含显式列出的网页资产与许可，不包含环境文件、私人报告或 Node 后端。
-- 访客凭据通过显式环境对象传给客户端，不回退读取作者的配置；测试覆盖不同访客实例隔离、无 Key 仍可排盘、配置不触发网络、清除取消请求且拒绝迟到结果、缓存不重复调用。
-- Key 模块延迟加载期间离开页面，后到的成功或失败回调均不会恢复 Key 或写回页面状态；测试执行实际前端提交回调。
-- 浏览器本地静态预览已验证零背景单盘生成、Key 输入框配置后清空、未验证状态、无效 Key 的官方认证错误及资料保留。
-- 对公开 Origin `https://www.theodoreoy.com` 的真实响应通过 CORS 核对；项目网站已配置强制 HTTPS。
+- `npm run check`: 103 tests passed (the original 90 + 6 browser-compatible core tests + 4 browser runtime tests + 3 key-submission lifecycle tests), along with type checking and integrity checks for all 5 vendor files. The restricted environment initially blocked loopback connections in 5 HTTP tests; the complete check passed after local connections were permitted.
+- `npm run build:web` and `node --check public/app.js` passed. The static release contains only explicitly listed web assets and licenses, with no environment files, private reports, or Node backend.
+- Visitor credentials reach the client through an explicit environment object, with no fallback to the author's configuration. Tests cover isolation between visitor instances, chart generation without a key, configuration without network requests, cancellation and rejection of late results after clearing a key, and cache reuse without additional calls.
+- If the user leaves while the key module is loading lazily, neither a late success nor a late failure callback restores the key or writes page state. Tests execute the actual frontend submission callback.
+- A local static browser preview verified single-candidate generation with no background answers, clearing the key input after configuration, the unverified status, the official authentication error for an invalid key, and retention of the entered birth information.
+- CORS was checked against actual responses for the public Origin `https://www.theodoreoy.com`. HTTPS enforcement was configured for the project site.
 
-### 公网发布与页面验收
+### Public Deployment and Page Checks
 
-0.3.0 实现提交 `ed667d7` 的 [Windows / Linux 检查](https://github.com/130U/Divination-and-Destiny-Studies/actions/runs/40714096462)与 [Pages 发布](https://github.com/130U/Divination-and-Destiny-Studies/actions/runs/40714096272)均成功。公开入口为 [www.theodoreoy.com/Divination-and-Destiny-Studies](https://www.theodoreoy.com/Divination-and-Destiny-Studies/)，已启用强制 HTTPS。
+Both the [Windows / Linux checks](https://github.com/130U/Divination-and-Destiny-Studies/actions/runs/40714096462) and [Pages deployment](https://github.com/130U/Divination-and-Destiny-Studies/actions/runs/40714096272) succeeded for implementation commit `ed667d7` of 0.3.0. The public entry point is [www.theodoreoy.com/Divination-and-Destiny-Studies](https://www.theodoreoy.com/Divination-and-Destiny-Studies/), with enforced HTTPS.
 
-- 首页、应用脚本、浏览器 bundle、样式与第三方许可均返回 HTTP 200。HTML、两个脚本和完整第三方许可与本机产物字节一致；CSS 仅 Windows / Git 的 CRLF 与 LF 换行有差异，规范化后内容一致。
-- 在真实公网页面填写纯合成出生资料（2000-06-15 09:30、Asia/Shanghai、女、经度 121.47、关闭真太阳时），27 项背景全部留空，成功生成一个候选：庚辰、壬午、甲辰、己巳。无 Key 时 AI 按钮禁用，没有假报告。
-- GitHub 已渲染产品 README、真实截图和公开 HTTPS 入口；About 的描述与 homepage 经远端接口读回确认。
-- 公开页面的有效 Key 两阶段点击流程没有另行重复付费验收；下文记录的是实际发布 bundle 在 Node 中的真实调用。本地静态预览已单独验证浏览器官方认证错误与清除 Key 行为。
+- The home page, application script, browser bundle, stylesheet, and third-party licenses all returned HTTP 200. The HTML, both scripts, and complete third-party license file matched the local artifacts byte for byte. CSS differed only in Windows / Git CRLF versus LF line endings; its content matched after normalization.
+- On the actual public page, entirely synthetic birth information was entered: 2000-06-15 09:30, Asia/Shanghai, female, longitude 121.47, and true solar time disabled. All 27 background questions were left blank. One candidate was generated successfully, with pillars Geng-Chen, Ren-Wu, Jia-Chen, and Ji-Si. Without a key, the AI buttons were disabled and no simulated report appeared.
+- GitHub rendered the product README, actual UI screenshot, and public HTTPS link. The About description and homepage were confirmed by reading them back through the remote interface.
+- The two-stage click flow with a valid key on the public page was not subjected to another paid acceptance run. The live calls below used the actual released bundle in Node. The local static browser preview separately verified the official authentication error and key-clearing behavior.
 
-### 发布包的真实模型检查
+### Live Model Check of the Release Bundle
 
-`npm run test:web:live` 将 **实际的 dist/browser.js** 加载到 Node，使用本机测试凭据与纯合成出生资料，并发送公开网站的 Origin 头。它验证浏览器发布包的两阶段行为和认证响应的 CORS 头，**不是在浏览器 UI 中输入真实 Key 的验收**。最多两次请求，没有自动重试；Key 和模型原始正文不记录到输出。
+`npm run test:web:live` loads **the actual dist/browser.js** into Node, uses local test credentials and entirely synthetic birth information, and sends the public site's Origin header. It checks the browser release bundle's two-stage behavior and the CORS headers of authenticated responses. **It is not an acceptance test in which a real key was entered through the browser UI.** The run permits at most two requests, with no automatic retries. Neither the key nor raw model report text is written to its output.
 
-这轮两阶段成功，背景全部未知，analysis 输出 4 节内容；重复阶段命中缓存。请求与返回模型名均为 `deepseek-flash`，思考参数 `medium`。
+Both stages succeeded in this run. All background information was unknown, analysis returned 4 sections, and repeated stages hit the cache. Both the requested and returned model names were `deepseek-flash`, with thinking set to `medium`.
 
-| 阶段 | 输入 tokens | 输出 tokens | 总 tokens | 缓存输入 tokens | reasoning tokens | 耗时 ms |
+| Stage | Input tokens | Output tokens | Total tokens | Cached input tokens | Reasoning tokens | Duration, ms |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
 | review | 3,759 | 2,384 | 6,143 | 640 | 1,851 | 14,554 |
 | analysis | 4,772 | 4,484 | 9,256 | 640 | 2,671 | 31,924 |
-| 合计 | 8,531 | 6,868 | **15,399** | 1,280 | 4,522 | — |
+| Total | 8,531 | 6,868 | **15,399** | 1,280 | 4,522 | — |
 
-以上是该轮两次调用的用量，不含其他版本或无效凭据检查，不代表预测准确率测试。缓存输入和 reasoning 已分别包含在输入、输出中，不能重复相加。
+These figures cover only the two calls in this run, excluding other versions and invalid-credential checks. This was not a prediction-accuracy test. Cached input and reasoning tokens are already included in input and output totals, respectively, and must not be added again.
 
-## 0.2.0 离线检查历史
+## 0.2.0 Offline Check History
 
-在 Windows、Node.js 24.16.0 下运行 `npm run check`：
+`npm run check` was executed on Windows with Node.js 24.16.0:
 
-- TypeScript 检查通过。
-- 90 项测试通过：历法 21 项、DeepSeek 传输 16 项、问卷 25 项、本地 HTTP 接口 5 项、工作流 23 项。
-- 5 份未修改的真一上游文件通过 SHA-256 和 Git blob SHA-1 完整性核验。
-- `node --check public/app.js` 通过。
+- TypeScript checking passed.
+- 90 tests passed: 21 calendar tests, 16 DeepSeek transport tests, 25 questionnaire tests, 5 local HTTP API tests, and 23 workflow tests.
+- All 5 unchanged Zhenyi upstream files passed SHA-256 and Git blob SHA-1 integrity checks.
+- `node --check public/app.js` passed.
 
-测试包括节气边界、农历换算、真太阳时、DST 缺口及重复时间、完整及省略问卷、模型引用修复、缓存、并发、过期清理和错误处理。0.2.0 新增覆盖零背景单盘和多盘继续分析、部分答案保留、不适用和未知引用被剔除并显示警告、重复引用去重、关键输出失败仍记录安全用量。错误候选身份及缺少正文仍拒绝，不以编造报告代替失败。HTTP 测试须允许本机 loopback 连接。模型测试使用受控假客户端，不访问真实 API；应用没有假报告回退。
+Tests cover solar-term boundaries, lunar conversion, true solar time, DST gaps and repeated times, complete and omitted questionnaires, model-reference repair, caching, concurrency, expiry cleanup, and error handling. New 0.2.0 coverage includes proceeding with one or multiple candidates without background answers, retaining partial answers, removing unknown or not-applicable references with warnings, deduplicating references, and preserving safe usage metadata when essential output validation fails. Incorrect candidate identities and missing report text are still rejected; failure is not replaced with a fabricated report. HTTP tests require local loopback access. Model tests use controlled fake clients, not the real API; the application has no simulated-report fallback.
 
-2026-10-28 配置更新：默认模型仍为 `deepseek-flash`（该日官方对应 DeepSeek-V4.1-Flash-1017），默认推理参数改为 `medium`。传输测试确认默认与显式配置均将 `reasoning_effort: "medium"` 原样发送，没有降为 `low` 或关闭思考。官方将 `medium` 映射为实际 `high`；这项映射由提供方文档说明，离线测试不证明真实服务实际执行情况。
+Configuration update on 2026-10-28: the default model remained `deepseek-flash`, officially mapped that day to DeepSeek-V4.1-Flash-1017, while the default reasoning parameter changed to `medium`. Transport tests confirmed that default and explicit settings both send `reasoning_effort: "medium"` unchanged, without lowering it to `low` or disabling thinking. The provider maps `medium` to an effective `high` level. That mapping comes from provider documentation; offline tests do not prove what the live service actually executed.
 
-## 浏览器检查
+## Browser Checks
 
-0.2.0 在独立的 3212 本地服务验收，没有刷新或修改用户原有的 3211 会话。1280 像素桌面视口和 390 像素手机视口均无横向溢出；手机目录可展开、点击步骤后收起。背景分组默认折叠，27 道题及适用性均留空也可以生成候选盘。实际校盘和分析状态均显示在对应区块；没有同时出现顶部成功和本次失败提示。检查时无浏览器警告或错误，JSON 报告导出成功。
+The 0.2.0 acceptance check used a separate local service on port 3212, without refreshing or modifying the user's existing session on port 3211. Neither the 1280-pixel desktop viewport nor the 390-pixel mobile viewport had horizontal overflow. The mobile navigation expanded and collapsed after a step was selected. Background groups were collapsed by default, and candidates could be generated with all 27 questions and applicability checks left blank. Review and analysis statuses appeared within their respective sections, without a simultaneous top-level success message and a current failure message. No browser warnings or errors were observed, and JSON report export succeeded.
 
-新版使用纸白背景、细网格、编号侧栏、蓝色导航指示、方角按钮和衬线报告正文，借鉴 Cognition 的布局节奏；没有复制其品牌、专有字体或图片。
+The revised UI used a paper-white background, fine grid, numbered sidebar, blue navigation marker, square buttons, and serif report text, drawing on Cognition's layout rhythm. It did not copy Cognition's brand, proprietary fonts, or images.
 
-### 0.1.0 的历史页面检查
+### Historical 0.1.0 Page Check
 
-用明确标为虚构的资料完成实际页面填写与本地请求。合成输入为公历 2000-06-15、Asia/Shanghai、女、经度 121.47，不启用真太阳时；时间范围 09:00–13:00 返回 3 个不同四柱候选。将结束时间改为 12:59 后，旧结果立即失效，重新提交返回 2 个候选。
+The actual page was filled and local requests were made using explicitly fictional information. The synthetic input was Gregorian 2000-06-15, Asia/Shanghai, female, longitude 121.47, with true solar time disabled. The 09:00–13:00 time range returned 3 distinct Four-Pillars candidates. Changing the end time to 12:59 immediately invalidated the old result; resubmission returned 2 candidates.
 
-该次本地页面检查显示 AI 尚未调用；未配置时 AI 按钮禁用。检查时未捕获浏览器控制台错误；658 像素视口的页面宽度为 658 像素，没有横向溢出。这一页面检查与下述真实 API 脚本验收是不同的检查。
+This local page check showed that AI had not yet been called, and AI buttons were disabled when no key was configured. No browser console errors were captured. At a 658-pixel viewport, the page width was 658 pixels, with no horizontal overflow. This page check was separate from the live API script acceptance runs below.
 
-## 0.2.0 零背景真实 API 验收
+## 0.2.0 Live API Acceptance with No Background Answers
 
-2026-10-28 在实际浏览器页面只填写虚构出生资料：公历 2000-06-15、09:30、Asia/Shanghai、女、经度 121.47、关闭真太阳时。27 项背景和适用性均留空，导出的报告确认已回答项数为 0。未使用真实用户经历。
+On 2026-10-28, only fictional birth information was entered in the actual browser page: Gregorian 2000-06-15, 09:30, Asia/Shanghai, female, longitude 121.47, and true solar time disabled. All 27 background questions and the applicability checks were left blank; the exported report confirmed 0 answered items. No real user experiences were used.
 
-- 本地生成一个候选；review 返回 `provisional`，选择来源为 `birth_input`。
-- analysis 返回 `chart_only`，输出结构特点、学习与职业、关系、资源与行动规划四节实质内容及条件性情景。
-- 缺少背景显示为阅读提示，不阻止报告；引用和结构校验通过。
-- 本轮只发起两次模型调用，没有重试。JSON 导出读回确认以下用量。
-- 请求配置为 `deepseek-flash`、`medium`；两个响应的提供方模型标签均为 `deepseek-flash`，仍不是 1017 快照的独立证明。
+- Local calculation produced one candidate. Review returned `provisional`, with selection source `birth_input`.
+- Analysis returned `chart_only`, with four substantive sections covering chart structure, learning and career, relationships, and resources and action planning, plus conditional scenarios.
+- Missing background information appeared as reading guidance rather than blocking the report. Reference and structure validation passed.
+- This run made only two model calls, with no retry. Reading back the JSON export confirmed the usage below.
+- The requested configuration was `deepseek-flash` with `medium`; both responses carried the provider model label `deepseek-flash`. This still does not independently establish the identity of the 1017 snapshot.
 
-| 阶段 | 输入 tokens | 输出 tokens | 总 tokens | 缓存输入 tokens | reasoning tokens | 耗时 ms |
+| Stage | Input tokens | Output tokens | Total tokens | Cached input tokens | Reasoning tokens | Duration, ms |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
 | review | 3,765 | 891 | 4,656 | 128 | 320 | 6,852 |
 | analysis | 4,793 | 6,260 | 11,053 | 128 | 4,421 | 39,336 |
-| 合计 | 8,558 | 7,151 | **15,709** | 256 | 4,741 | — |
+| Total | 8,558 | 7,151 | **15,709** | 256 | 4,741 | — |
 
-reasoning 和缓存输入已分别包含在输出、输入统计内，不能重复相加。此表只计本轮两次调用，不与下面历史样例混加，也没有据此估算账单金额。多候选零背景路径和重复操作缓存本轮由回归测试覆盖，未为这些情形追加真实付费调用。这里验证的是流程可用性，不是命理判断的正确性。
+Reasoning and cached input tokens are already included in output and input statistics, respectively, and must not be added again. This table counts only the two calls in this run; it is not combined with the historical examples below, and no monetary bill was estimated from it. The multiple-candidate path without background answers and repeated-operation caching were covered by regression tests in this round; no additional paid calls were made for those cases. This verifies workflow availability, not the correctness of divination judgments.
 
-## 0.1.0 真实 API 合成验收历史
+## 0.1.0 Live API Synthetic Acceptance History
 
-2026-10-28 使用仓库内完全虚构的资料进行了两轮真实 DeepSeek 请求，每轮两次，共四次请求。未使用真实个人命例。请求模型为 `deepseek-flash`，思考参数原样发送 `medium`。提供方在成功重测中返回的模型标签也为 `deepseek-flash`；该标签不是独立的 DeepSeek-V4.1-Flash-1017 快照身份证明，1017 对应关系来自当日官方文档。
+On 2026-10-28, two rounds of real DeepSeek requests were made using entirely fictional repository fixtures: two requests per round, four requests in total. No real personal cases were used. The requested model was `deepseek-flash`, with `medium` sent unchanged as the thinking parameter. In the successful retest, the provider also returned `deepseek-flash` as the model label. That label does not independently identify the DeepSeek-V4.1-Flash-1017 snapshot; the 1017 mapping comes from the official documentation available that day.
 
-### 首轮：分析输出被严格校验拒绝
+### First Round: Analysis Rejected by Strict Validation
 
-首轮 review 通过，analysis 在 `evidence_ids` 的已知事实引用校验处失败。该轮没有保留原始模型输出或 token 用量，无法确认具体是未知回答、不适用回答、重复 ID 或其他引用格式问题；不能把推测写成已确认原因，也不能把未保留用量解释为没有费用。
+Review passed in the first round, but analysis failed validation of known-fact references in `evidence_ids`. Neither the raw model output nor token usage was retained. It is therefore not possible to determine whether the cause was an unknown answer, a not-applicable answer, a duplicate ID, or another reference-format issue. An inferred cause must not be presented as confirmed, and missing usage must not be interpreted as no cost.
 
-随后明确模型输入的 `referenceable_evidence_ids` 白名单，并让提示词说明未知 / 不适用回答不能进入引用数组；缺乏事实的段落可以用空引用加 `uncertainties` 表达信息缺口。当时的 0.1.0 严格校验没有放宽（0.2.0 后来改为非致命引用修复，见上文）。下一轮通过说明当时版本完成了该合成样例的接口契约，不足以反推首轮具体错误或保证以后不会失败。
+The model input was then given an explicit `referenceable_evidence_ids` allowlist, and the prompt stated that unknown and not-applicable answers must not appear in reference arrays. Sections without facts could use empty references and explain gaps in `uncertainties`. The strict 0.1.0 validator was not relaxed at that point; 0.2.0 later introduced nonfatal reference repair, as described above. The next round's success establishes that the then-current version satisfied the interface contract for that synthetic case. It does not identify the first round's exact cause or guarantee that future requests will succeed.
 
-### 第二轮：两阶段契约通过
+### Second Round: Both Stage Contracts Passed
 
-- 候选数：3。
-- review 状态：`insufficient_evidence`，没有唯一推荐。
-- 脚本显式选择一个合成候选，继续检查 analysis 接口；这一选择不算校盘成功。
-- analysis 保持所选工作盘，输出通过结构和引用校验。
-- 重复 review 和重复同一候选的 analysis 均命中缓存，没有新增模型请求。
+- Candidate count: 3.
+- Review status: `insufficient_evidence`, without a unique recommendation.
+- The script explicitly selected a synthetic candidate to continue checking the analysis interface; this selection does not count as successful birth-time rectification.
+- Analysis retained the selected working chart, and its output passed structure and reference validation.
+- Repeated review and repeated analysis of the same candidate both hit the cache, without additional model requests.
 
-以下均为第二轮提供方返回的用量与客户端测得的请求耗时：
+The following are provider-reported usage and client-measured durations for the second round only:
 
-| 阶段 | 输入 tokens | 输出 tokens | 总 tokens | 缓存输入 tokens | reasoning tokens | 耗时 ms |
+| Stage | Input tokens | Output tokens | Total tokens | Cached input tokens | Reasoning tokens | Duration, ms |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
 | review | 7,208 | 4,355 | 11,563 | 0 | 3,401 | 28,452 |
 | analysis | 4,820 | 7,970 | 12,790 | 128 | 5,955 | 43,550 |
-| 合计 | 12,028 | 12,325 | **24,353** | 128 | 9,356 | — |
+| Total | 12,028 | 12,325 | **24,353** | 128 | 9,356 | — |
 
-reasoning tokens 已包含在输出及总 token 统计中，不再相加；缓存输入是输入统计的子项，也不另加。24,353 仅是第二轮用量，不包括未保留用量的首轮；这里没有据此推算账单金额。每次业务输出上限保持 8,192 tokens。
+Reasoning tokens are already included in output and total tokens, and are not added again. Cached input tokens are a subset of input tokens and are not added separately. The 24,353 figure covers only the second round, excluding the first round whose usage was not retained. No monetary bill is inferred here. Each business-stage request retained an output ceiling of 8,192 tokens.
 
-### 验收脚本的信号与请求上限
+### Acceptance-Script Signals and Request Cap
 
-`npm run test:live` 分别记录提供方响应元数据和业务阶段完成情况。只有两阶段校验及两项缓存检查通过，才输出 `status: passed`；失败输出 `status: failed`、`completedStages` 和已取得的安全响应元数据，并以非零状态退出。记录不包含原始回答或私人资料。网络、超时或客户端解析失败可能无法取得 usage，仍不能据此判断没有费用。
+`npm run test:live` records provider response metadata separately from completion of the business stages. It emits `status: passed` only after both stage validations and both cache checks pass. On failure, it emits `status: failed`, `completedStages`, and any safe response metadata already obtained, then exits with a nonzero status. Records contain no raw answers or private information. Network, timeout, or client parsing failures may prevent usage from being obtained; this still does not establish that no fee was incurred.
 
-第二轮之后，脚本增加了请求发出前的 `attemptedRequests` 上限 2，缓存检查若意外触发额外请求，会在实际调用前被拒绝；失败尝试也计数。这项诊断与请求计数修改已通过 `npm run check`，没有为它额外重跑付费验收。
+After the second round, the script added a pre-request `attemptedRequests` cap of 2. If a cache check unexpectedly attempts another request, it is rejected before the call is made; failed attempts also count toward the cap. This diagnostic and request-counting change passed `npm run check`, without another paid acceptance run specifically for it.
 
-## 验证边界
+## Validation Boundaries
 
-GitHub Actions 配置覆盖 Windows 和 Linux 的 Node 24 检查。具体提交的远程执行状态以仓库 Actions 记录为准。
+GitHub Actions is configured to check Node 24 on Windows and Linux. The remote result for a particular commit is determined by that repository's Actions records.
 
-历法测试覆盖文档中明确列出的边界，不是全部历史日期、时区和天文模型的穷尽认证。真实 API 验收覆盖纯合成样例的两阶段传输、结构、引用和缓存行为；没有测量真实出生时辰识别率、自然语言解释正确率或未来预测效果。
+Calendar tests cover the boundaries explicitly listed in the documentation. They are not an exhaustive certification of all historical dates, time zones, or astronomical models. Live API acceptance covers two-stage transport, structure, references, and caching for entirely synthetic examples. It does not measure real birth-time identification accuracy, the correctness of natural-language interpretations, or future predictive performance.

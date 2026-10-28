@@ -1,73 +1,73 @@
-# 架构与证据边界
+# Architecture and Evidence Boundaries
 
-0.3.0 将同一排盘、问卷、工作流和 DeepSeek 客户端用于两种模式：静态在线版全部在浏览器运行，访客使用自己的 Key 直连官方接口；本机版使用 Node 24 原生 TypeScript 与内置 HTTP 服务，Key 来自运行者的服务端环境。两种模式都只在内存保存私人会话，不写入数据库。
+Version 0.3.0 shares chart calculation, questionnaire handling, the workflow, and the DeepSeek client across two modes. The static web app runs entirely in the browser, using each visitor's own key to call the official API directly. The local app uses Node 24's native TypeScript support and built-in HTTP server, with a key supplied through the operator's server environment. Both modes keep private sessions only in memory, without a database.
 
-浏览器构建使用 esbuild，运行时使用固定版本的 `@noble/hashes`；开发检查依赖 TypeScript 与 Node 类型声明。静态站点只分发页面、程序和许可，不提供作者账户付费的模型后端。本机 Node 服务仍只监听 `127.0.0.1`。
+The browser build uses esbuild and a pinned version of `@noble/hashes` at runtime. Development checks use TypeScript and Node type declarations. The static site distributes only the page, application code, and licenses; it provides no model backend funded by the author's account. The local Node service continues to listen only on `127.0.0.1`.
 
-## 数据流
+## Data flow
 
 ```mermaid
 flowchart TD
-    A[必填出生表单 + 可选背景问卷] --> B[本地历法与已填内容校验]
-    B --> C[全部候选 + 校盘材料 + 背景材料]
-    C --> D[当前运行环境冻结会话与评估日期]
-    D --> E[DeepSeek一次比较全部候选]
-    E --> F[单盘按出生输入 / 多盘按模型排序暂选]
-    F --> G[DeepSeek分析工作盘与已知背景]
-    G --> I[实质正文 + 证据模式 + 警告 + 该次用量]
+    A["Required birth input + optional background questionnaire"] --> B["Local calendar calculation and supplied-answer validation"]
+    B --> C["All candidates + comparison evidence + personal context"]
+    C --> D["Freeze session data and evaluation date in the current runtime"]
+    D --> E["DeepSeek compares all candidates in one call"]
+    E --> F["Single chart from birth input / provisional choice from model ranking"]
+    F --> G["DeepSeek analyzes the working chart and known context"]
+    G --> I["Substantive text + evidence mode + warnings + per-call usage"]
 ```
 
-问卷缺失值规范化、适用性与格式校验、日期转换和候选生成均在模型请求之前完成。出生资料必填，27 道问题和 2 道适用性确认全部可选；缺失记为 unknown，不补造事实。本地计算确定历法与数据格式；多候选的经历比较和工作盘建议由 LLM 完成，不使用隐藏的命理评分权重或预先淘汰候选。
+Missing-answer normalization, applicability and format validation, date conversion, and candidate generation all finish before a model request. Birth details are required; all 27 questions and both applicability questions are optional. Missing answers become unknown, without invented facts. Local calculation determines calendar results and validates data formats. The LLM compares life events across multiple candidates and recommends a working chart. The system uses neither hidden divination scoring weights nor advance elimination of candidates.
 
-## 模块职责
+## Module responsibilities
 
-| 模块 | 职责 |
+| Module | Responsibility |
 | --- | --- |
-| `configs/question_bank.v1.json` | 问题、选项、适用条件、长度与数量限制、来源版本 |
-| `src/questionnaire.ts` | 缺失值规范化、已填内容校验，生成带来源标签的 evidence / context |
-| `src/chartEngine.ts` | 调用固定真一历法，处理公农历、时区、真太阳时及候选枚举 |
-| `vendor/zhenyi/` | 5 份未修改的上游代码、数据和许可，以及本地来源清单 |
-| `src/workflow.ts` | 会话、步骤顺序、结果缓存、并发控制、期限与清理 |
-| `src/prompts.ts` | 分别构造候选比较和背景分析输入，控制单次输入预算 |
-| `src/results.ts` | 验证必要正文与候选身份，规范化引用并生成报告警告 |
-| `src/deepseek.ts` | 接收对应环境的凭据，固定官方接口、超时、响应大小、JSON 与用量读取 |
-| `src/browser.ts` | 访客 Key 闭包、直接请求、内存操作 adapter、清除与取消 |
-| `src/server.ts` | 本机 HTTP API、服务端凭据和来源限制 |
-| `public/` | 两种模式共享的资料填写与结果展示 |
-| `scripts/build-web.ts` | 打包浏览器程序与静态资源，保留许可证，不复制环境文件或报告 |
+| `configs/question_bank.v1.json` | Questions, options, applicability conditions, length and count limits, and source version |
+| `src/questionnaire.ts` | Normalize missing answers, validate supplied content, and build source-labeled evidence and context |
+| `src/chartEngine.ts` | Call the pinned Zhenyi calendar core; handle Gregorian/lunar dates, time zones, true solar time, and candidate enumeration |
+| `vendor/zhenyi/` | Five unmodified upstream code, data, and license files, plus the local source manifest |
+| `src/workflow.ts` | Sessions, operation order, result caching, concurrency control, expiration, and cleanup |
+| `src/prompts.ts` | Build separate inputs for candidate comparison and contextual analysis; enforce per-call input budgets |
+| `src/results.ts` | Validate essential text and candidate identity; normalize citations and produce report warnings |
+| `src/deepseek.ts` | Accept credentials from the relevant environment; enforce the official endpoint, timeouts, and response-size limits; parse JSON and usage |
+| `src/browser.ts` | Keep visitor keys in a closure; make direct requests; provide an in-memory operation adapter, clearing, and cancellation |
+| `src/server.ts` | Local HTTP API, server-side credentials, and origin restrictions |
+| `public/` | Shared data-entry and result-display interface for both modes |
+| `scripts/build-web.ts` | Bundle the browser app and static assets; retain licenses without copying environment files or reports |
 
-会话创建时保存独立冻结的数据副本和 `asOfDate`，模型输入使用 `as_of_date` 保留同一评估时间原点。后续操作只带会话 ID 与可选候选 ID，不能用界面修改过的四柱或回答替换工作流快照。资料修正需新建会话。浏览器 adapter 的 `/api/...` 是内存分派名称，不向静态站点发送这些 HTTP 请求；只有 Node 模式具有对应 HTTP 端点。
+Session creation stores an independent, frozen data copy and `asOfDate`. Model inputs use `as_of_date` to preserve the same evaluation cutoff. Later operations carry only a session ID and an optional candidate ID; client-edited pillars or answers cannot replace the workflow snapshot. Data corrections require a new session. The browser adapter's `/api/...` names dispatch in-memory operations and do not make those HTTP requests to the static site. Only Node mode exposes the corresponding HTTP endpoints.
 
-## 两次模型调用
+## Two model calls
 
-第一次只发送出生输入、全部候选、校盘材料及警告，候选须全部出现在结果里。单候选由出生输入直接成为 `provisional` 工作盘，`selection_source=birth_input`。多候选使用模型选择；未给出选择时，可采用完整模型排序首位并标记 `ranked_fallback`。证据不足仍继续暂定分析，明确低把握度、其他候选及待核对事项。未知状态和传统外貌等弱线索不能包装成已验证事实。
+The first call sends only the birth input, every candidate, chart-comparison evidence, and warnings. Every candidate must appear in the result. A single candidate becomes the `provisional` working chart directly from the birth input, with `selection_source=birth_input`. With multiple candidates, the model selects a chart. If it omits a selection, the first entry in a complete model ranking may be used as `ranked_fallback`. Limited evidence still permits provisional analysis, with explicit uncertainty, alternatives, and unresolved questions. Unknown answers and weak traditional clues, such as appearance, must not be presented as verified facts.
 
-第二次发送选定工作盘、第一次结论、校盘材料和可选背景材料。没有已知个人材料时，提供基于命盘的实质条件性分析并标记 `chart_only`；有材料时标记 `context_supported`，结合实际背景解释。该标记表示输入可用性，不表示事实已经核实。工作盘必须来自本次候选；返回结果不能偷偷换盘。评估日期在两次调用间保持一致。
+The second call sends the selected working chart, the first-stage conclusion, chart-comparison evidence, and optional personal context. With no known personal information, it provides substantive conditional analysis based on the chart and marks the result `chart_only`. Otherwise, it uses `context_supported` and interprets the chart alongside the supplied background. This label describes available input, not verified facts. The working chart must belong to the current candidate set, and the response cannot silently switch charts. Both calls use the same evaluation date.
 
-成功的校盘结果按会话缓存，成功的分析结果按会话及候选 ID 缓存。正在执行的重复操作会被阻止；每个工作流实例最多一个模型调用，浏览器各标签页独立。缓存只复用已有成功结果，不把未知、失败或超时伪装成成功。请求失败不会自动重试，显式重试可能再次计费。
+Successful reviews are cached by session; successful analyses are cached by session and candidate ID. Duplicate operations already in progress are blocked. Each workflow instance permits at most one model call at a time, and browser tabs have separate instances. Caching reuses successful results only; unknown states, failures, and timeouts are not presented as successes. Failed requests are never retried automatically. An explicit retry may incur another charge.
 
-## 历法口径与精度
+## Calendar conventions and precision
 
-上游固定提交为 `383a726437a81db2b87eed517ef5e6ccd30b7bd4`。wrapper 的完整规则标识为 `zhenyi-blind-00h-split-zi-absolute-jieqi-utc8-local-dayhour-v2-minute`：年/月在绝对时刻对应的固定 UTC+8 坐标上比较节气，日/时使用选定的当地民用时间或真太阳时间。这样时区或经度变化不会移动同一个全球节气瞬间。
+The pinned upstream commit is `383a726437a81db2b87eed517ef5e6ccd30b7bd4`. The wrapper's full rule identifier is `zhenyi-blind-00h-split-zi-absolute-jieqi-utc8-local-dayhour-v2-minute`. Year and month pillars compare solar-term boundaries on a fixed UTC+8 timeline representing the absolute instant. Day and hour pillars use the selected local civil time or true solar time. Changing the time zone or longitude therefore does not move the same global solar-term instant.
 
-时间未知时枚举全天 1,440 个民用分钟，处理 DST 缺口和重复解释，仅合并四柱完全相同的结果。相同四柱不保证精确交运时刻相同：起运与大运使用该组第一个有效分钟的代表计算，多分钟组明确警告，不能直接作逐日事件断点依据。底层历法支持范围比产品出生表单更广；产品按转换后的公历限定 1900 年至评估当天。详细口径与未完成验证见 [历法集成说明](ZHENYI_INTEGRATION.md)。
+When the birth time is unknown, the engine enumerates all 1,440 civil minutes of the day, handles DST gaps and repeated-time interpretations, and merges only results with identical Four Pillars. Identical pillars do not guarantee identical exact luck-cycle transition times. The initial transition and later luck cycles use a representative calculation for the group's first valid minute. Groups spanning multiple minutes carry an explicit warning and cannot directly serve as daily event breakpoints. The underlying calendar supports a wider date range than the product's birth form, which limits converted Gregorian dates to 1900 through the evaluation date. See the [calendar integration notes](ZHENYI_INTEGRATION.md) for detailed conventions and outstanding validation.
 
-## 结构检查与预测有效性
+## Structural validation and predictive validity
 
-每条回答保留题目 ID、原文、回复、阶段、用途，以及 `source: user_report`、`independentlyVerified: false`。`informationStatus: known` 仅表示有实质回复，不表示事实已独立核实。用于选择工作盘的经历，不能随后当成独立预测命中。
+Each answer retains its question ID, original question text, response, stage, purpose, `source: user_report`, and `independentlyVerified: false`. `informationStatus: known` means only that a substantive answer exists; it does not mean the facts were independently verified. Events used to select a working chart cannot later count as independent predictive hits.
 
-模型输出校验拒绝伪造、遗漏或重复候选、选择身份不一致及缺少必要正文。引用元数据的轻微问题会修复或移除，并通过 `reportWarnings` 展示，保留已有正文；未知回答不能因这种修复变成事实。分析输入的 `chart_reference_paths` 从实际工作盘生成，没有引用或未知项说明时会警告。引用存在并不证明模型理解正确；自然语言解释、因果关系和预测效果仍未得到语义或统计验证。模型自信、相对名次和规则值都不转换成真实时辰概率。
+Output validation rejects invented, omitted, or duplicate candidates, inconsistent selection identity, and missing essential report text. Minor citation-metadata issues are repaired or removed and disclosed through `reportWarnings`, while existing report text is preserved. Such repairs do not turn unknown answers into facts. The analysis input's `chart_reference_paths` are generated from the actual working chart; missing citations or uncertainty explanations produce warnings. A valid reference does not prove that the model understood it correctly. Natural-language explanations, causal claims, and predictive performance remain unverified semantically and statistically. Model confidence, relative rankings, and rule values are never converted into probabilities of the true birth hour.
 
-完整模型响应在业务校验失败时，错误保留安全的 `modelAttempt` 模型标签、耗时和用量，不返回原始正文。不会自动发起付费重试。页面和导出的 usage 只描述该次模型调用，不含另一阶段或此前失败、重试；缓存展示原请求用量，不能再次计费。未取得用量的失败也可能已产生费用。
+When a complete model response fails business validation, the error retains safe model labels, duration, and usage in `modelAttempt`, without returning the raw text. It does not trigger an automatic paid retry. Usage shown on the page or in exports describes only that model call, excluding the other stage and earlier failures or retries. Cached results show the original request's usage; that usage must not be counted as a new charge. Failures without returned usage may still have incurred charges.
 
-离线测试验证输入边界、候选覆盖、日期口径、会话隔离、缓存与错误处理。真实 API 合成验收验证服务连接和端到端契约。两者都不替代隐藏可靠出生时辰的独立评估或预先定义的未来结果检验。
+Offline tests check input boundaries, candidate coverage, date conventions, session isolation, caching, and error handling. Synthetic checks against the real API test connectivity and the end-to-end contract. Neither replaces an independent evaluation with reliable birth times withheld from the system or a test against predefined future outcomes.
 
-## 数据保存与服务边界
+## Data retention and service boundaries
 
-会话从创建起 30 分钟过期，独立定时器负责到期清理；手动删除也会清空。Node 服务关闭或重启会丢失会话；在线版刷新、更换或清除 Key、页面离开也会清空 Key 和会话。正在请求的已清除会话不保留迟到结果，清除时会取消本地等待。期限不延长到最后一次操作，清除资料不意味着撤回 DeepSeek 已经收到的内容或取消费用。
+Sessions expire 30 minutes after creation, with individual timers responsible for cleanup. Manual deletion also clears them. Closing or restarting the Node service loses its sessions. In the web app, refreshing or leaving the page, or replacing or clearing the key, clears the key and sessions. Cleared sessions do not retain late responses, and clearing cancels local pending requests. The deadline does not extend with each operation. Clearing data does not withdraw content already received by DeepSeek or cancel charges.
 
-在线版的 Key 仅存在当前标签页闭包，不写入 localStorage、sessionStorage、URL、日志或导出报告。设置 Key 不调用模型，点击 AI 操作才以认证头直连 DeepSeek 官方接口；请求不经过作者后端，费用属于访客自己的账户。固定 endpoint、HTTPS 要求、静态页面连接策略与不跟随跳转限制收窄凭据的发送目标；这不等于承诺浏览器环境绝对安全。
+Online keys exist only in the current tab's closure memory. They are never written to localStorage, sessionStorage, URLs, logs, or exported reports. Setting a key does not call a model. An explicit AI action sends it in the authentication header directly to the official DeepSeek API, without an author-operated backend; charges belong to the visitor's account. The fixed endpoint, HTTPS requirement, static-page connection policy, and prohibition on following redirects constrain the credential's destination. They do not guarantee an absolutely secure browser environment.
 
-Node 版从服务端环境读取 Key；本地 `.env`、日志、私人资料目录和报告目录由 Git 忽略。如果另行开放同一个 Node 后端给别人，请求会消耗运营者 Key 对应的额度。Node HTTP 层限制请求大小、来源和内容类型，静态文件采用白名单，返回时隐藏凭据及提供方原始错误。两种模式都没有离线模拟报告回退；受控假客户端只在测试中注入。
+Node mode reads its key from the server environment. Local `.env` files, logs, private-data directories, and report directories are ignored by Git. If the same Node backend is separately made available to others, their requests consume the operator's key allowance. The Node HTTP layer restricts request size, origin, and content type; serves static files from an allowlist; and hides credentials and raw provider errors in responses. Neither mode falls back to simulated offline reports. Controlled fake clients are injected only in tests.
 
-本项目提供静态在线 BYOK 与本机运行，不包含站点账户、托管共享会话、支付或其他术数模块。各标签页的内存隔离不是多租户后端账户系统。旧 `bazi-context-agent` 仅是已获授权的题库设计来源，运行时不依赖其文件、服务或代码。历史本机验收与当前公网部署、浏览器直连验证分别记录，不能相互替代。
+The project provides static online BYOK and local execution. It does not include site accounts, hosted shared sessions, payments, or other divination systems. Per-tab memory isolation is not a multi-tenant backend account system. The old `bazi-context-agent` is only an authorized source of questionnaire design; runtime execution does not depend on its files, services, or code. Historical local checks, current public deployment checks, and direct-browser validation are recorded separately and cannot substitute for one another.

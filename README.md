@@ -1,35 +1,37 @@
 # Divination and Destiny Studies
 
-**让八字解读，结合你真实的人生。**
+**BaZi readings that take your real life into account.**
 
-[**在线体验 →**](https://www.theodoreoy.com/Divination-and-Destiny-Studies/) · [了解报告](#你会得到什么)
+[**Try it online →**](https://www.theodoreoy.com/Divination-and-Destiny-Studies/) · [What you get](#what-you-get)
 
-![Divination and Destiny Studies 实际产品界面](assets/product-preview.jpg)
+![Divination and Destiny Studies — live product interface in Simplified Chinese](assets/product-preview.jpg)
 
-相近的命盘，可能对应不同的家庭、教育机会、职业路径与现实压力。这里把传统八字与个人背景放在一起讨论，让解读落到你的具体处境：你有哪些资源，面对哪些约束，哪些方向值得继续思考。
+Similar birth charts can belong to people with very different families, opportunities, careers, and pressures. Divination and Destiny Studies brings personal context into BaZi (Four Pillars of Destiny), so a reading can address your circumstances: the resources you have, the constraints you face, and the directions you want to explore.
 
-填写出生资料即可开始。背景问卷全部可选；你可以先看基于命盘的分析，也可以补充关键经历，让报告结合自己的生活。没有提供的信息会保留为未知，不要求你先完成一整套问卷。
+Start with your birth details. Every background question is optional. You can get a chart-based reading first, or add significant experiences to make the analysis more relevant to your life. Missing information stays unknown; you do not have to complete a questionnaire to receive a report.
 
-## 时辰不确定，也能开始
+## Unsure of your birth time? You can still start.
 
-知道准确时间，可以直接进入单盘分析；只记得大致范围，甚至完全不知道时辰，也可以保留不同候选，比较支持线索、矛盾与待核对事项。材料不足时，先提供暂定工作盘和条件性分析，同时说明其他可能。
+Use an exact time, a same-day range, or an unknown time. The app calculates the eligible charts, then compares supporting clues, contradictions, and open questions. When the evidence is limited, it provides a provisional working chart and a conditional reading while keeping alternatives visible.
 
-## 你会得到什么
+## What you get
 
-- **候选比较**：看清不同出生时间对应的四柱，以及暂选当前工作盘的理由。
-- **个人分析**：围绕学习、职业、关系、资源与行动方向展开，区分命盘线索和你提供的现实背景。
-- **可保存的报告**：保留可用依据、分歧和未知项，支持下载，方便回看与继续核对。
+- **Candidate comparisons.** See the Four Pillars for each eligible birth time and the reasons for the provisional selection.
+- **Personal analysis.** Explore education, career, relationships, resources, and possible actions, with chart interpretations distinguished from the facts you supplied.
+- **A report to keep.** Download the reading with its supporting references, disagreements, and unknowns for later review.
 
-适合希望从八字视角了解自己、梳理过往经历，或把传统解读与当下选择放在一起思考的人。报告提供讨论的起点，不把暂定判断写成已经证实的人生结论。
+For people who want to explore BaZi, reflect on past experiences, or consider traditional interpretations alongside present choices. Each report is a starting point for reflection, with provisional judgments clearly identified.
 
-## 使用自己的 DeepSeek Key
+## Bring your own DeepSeek key
 
-在线版直接在浏览器运行。填入你自己的 DeepSeek API Key 后，点击 AI 操作才会从浏览器直连官方接口；请求不经过作者后端，费用计入你自己的 DeepSeek 账户。
+The online app runs in your browser. Add your own DeepSeek API key; an explicit AI action sends a request directly to the official API. Requests do not pass through an author-operated backend. Usage is billed to your DeepSeek account.
 
-Key 仅保存在当前页面内存，刷新、清除或离开页面时清空，不写入浏览器存储或导出报告。正常流程包含候选比较与深入分析两次模型请求；有效会话内复用同一成功结果，不再次请求模型。系统不会自动付费重试。
+Your key stays in the current page's memory and is cleared on refresh, explicit clearing, or page departure. It is never written to browser storage or exported reports. A normal workflow makes two model requests: candidate comparison, then analysis. Repeating the same successful operation within a valid session reuses its result. Failed requests are never retried automatically.
 
-当前不提供定时辰正确率或未来预测准确率承诺，也不把推荐名次当成概率。已完成的工程检查与合成样例验收见[验证记录](docs/VALIDATION.md)。
+The current interface and generated reports are in Simplified Chinese. Repository documentation is in English.
 
-[使用与本地运行](docs/GETTING_STARTED.md) · [分析流程](docs/ARCHITECTURE.md) · [技术接口](docs/API.md) · [历法来源](docs/ZHENYI_INTEGRATION.md) · [第三方许可](THIRD_PARTY_NOTICES.md)
+Birth-time identification and future prediction accuracy have not been established. A candidate's rank is not a calibrated probability. See the [validation record](docs/VALIDATION.md) for engineering checks and synthetic examples.
 
-本项目采用 [MIT License](LICENSE)，第三方文件保留原始许可和来源记录。
+[Usage and local setup](docs/GETTING_STARTED.md) · [How it works](docs/ARCHITECTURE.md) · [API reference](docs/API.md) · [Calendar engine](docs/ZHENYI_INTEGRATION.md) · [Third-party notices](THIRD_PARTY_NOTICES.md)
+
+Released under the [MIT License](LICENSE). Third-party files retain their original licenses and source records.

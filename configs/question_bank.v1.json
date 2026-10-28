@@ -7,14 +7,14 @@
     "sourceCheckoutRevision": "b277fec462bada4c09ac651ed02a68d25ccd935d",
     "sourceFileSha256": "a10cac9ad1928d702f81e3b71fcc8bcf51e5c025279192fcaab0aa3c50b135ff",
     "copiedOn": "2026-10-28",
-    "authorization": "用户授权在新仓库复用问卷设计；旧仓库只读。",
-    "revisionNote": "checkout revision 仅记录读取时的 HEAD；实际复制内容由 sourceFileSha256 标识，不假设工作区文件与该提交完全一致。",
+    "authorization": "The owner authorized reuse of the questionnaire design in this new repository; the source repository remains read-only.",
+    "revisionNote": "The checkout revision records HEAD at the time of reading. sourceFileSha256 identifies the content actually copied; the working file is not assumed to match that commit exactly.",
     "adaptations": [
-      "保留 B/C/D 题目 ID、原文、选项、适用条件和数量/长度上限；出生 A 组由独立必填表单处理。",
-      "问卷和适用性确认均可省略或部分填写；未提供的回答规范化为 unknown，缺失适用性规范化为 unknown。",
-      "sourceRequired 记录旧值；required=false 表示背景问卷可选，不要求补造经历或为了分析完成全部问题。",
-      "条件明确为 false 时，缺失的对应回答规范化为 not_applicable；已提交的非法值、矛盾及未来事件仍拒绝。",
-      "传统 symbol 只作弱线索；用户自述不构成独立验证命中。无已知背景时仍可进行暂定选盘和纯命盘分析。"
+      "Preserve B/C/D question IDs, original wording, options, applicability conditions, and count/length limits. Birth section A is handled by a separate required form.",
+      "The questionnaire and applicability confirmations may be omitted or partially completed. Missing answers and applicability values are normalized to unknown.",
+      "sourceRequired records the original value. required=false makes background questions optional without requiring invented experiences or full completion before analysis.",
+      "When an applicability condition is explicitly false, a missing corresponding answer becomes not_applicable. Invalid submitted values, contradictions, and future events are still rejected.",
+      "Traditional symbols are weak clues. Self-reported experiences do not constitute independent validation hits. Provisional chart selection and chart-only analysis remain available without known background."
     ]
   },
   "completionPolicy": {

@@ -1,34 +1,34 @@
-# 问卷输入与证据边界
+# Questionnaire Inputs and Evidence Boundaries
 
-本模块把可选回答分为校盘材料和分析背景，在 AI 请求前将缺失内容记为 unknown 并校验已填写内容。27 道问题与 2 道适用性确认全部可留空；出生资料足以排盘时可以先出结果。它不排候选盘、不计算命理分数、不判断出生时辰，也不调用外部服务。
+This module separates optional responses into chart-comparison evidence and analysis context. Before an AI request, it marks missing information as unknown and validates any supplied answers. All 27 questions and 2 applicability checks may be left blank; sufficient birth information is enough to generate charts and proceed. This module does not rank candidate charts, calculate divination scores, determine a birth time, or call external services.
 
-## 来源与本次调整
+## Source and Adaptation
 
-问题设计经用户授权复用自 `130U/bazi-context-agent` 的 `configs/question_bank.v1.json`，源版本为 `1.1`。读取时旧仓库 HEAD 为 `b277fec462bada4c09ac651ed02a68d25ccd935d`；实际源文件 SHA-256 为 `a10cac9ad1928d702f81e3b71fcc8bcf51e5c025279192fcaab0aa3c50b135ff`。HEAD 只标识当时 checkout，源文件散列才标识本次复制的内容；不假设旧工作区文件等于该提交。旧仓库仅被读取。
+The question design was reused, with the user's authorization, from `configs/question_bank.v1.json` in `130U/bazi-context-agent`, source version `1.1`. The old repository's HEAD at the time of reading was `b277fec462bada4c09ac651ed02a68d25ccd935d`; the actual source file's SHA-256 was `a10cac9ad1928d702f81e3b71fcc8bcf51e5c025279192fcaab0aa3c50b135ff`. HEAD identifies the checkout at that time, while the file hash identifies the copied content. The source working-tree file is not assumed to match that commit. The old repository was read only.
 
-新题库版本为 `1.1.0`，完整出处记录在 JSON 的 `provenance`。保留 B、C、D 组的 27 个题目 ID、原题文字、选项 ID / 文字、事件类型、适用条件、数量和长度上限。出生 A 组由必填的独立出生信息表单负责，不属于 `responses`。
+The adapted question bank is version `1.1.0`, with full provenance in its JSON `provenance` field. It retains all 27 question IDs in groups B, C, and D, their original wording, option IDs and labels, event types, applicability conditions, and count and length limits. Birth-information group A is handled by a separate required form and is not part of `responses`.
 
-旧题库的自适应提问、分数稳定后停止、锁盘后才收集背景等元策略不沿用。`sourceRequired` 保留原题设置；当前问题和适用性确认均为 `required: false`。每题可留空，也能选择 `unknown` 或 `not_applicable`。原有“不确定”“情况复杂或不确定”等选项保留；缺失状态的默认规则来自题库 `responsePolicy`。
+The source bank's higher-level strategies, such as adaptive questioning, stopping when scores stabilize, and collecting context only after a chart is locked, are not carried over. `sourceRequired` preserves the original setting; all current questions and applicability checks have `required: false`. Each question may be omitted or explicitly marked `unknown` or `not_applicable`. Original options such as "uncertain" and "complex or uncertain" remain available. Defaults for missing states come from the bank's `responsePolicy`.
 
-| 部分 | 原阶段 | 内容 | 用途 |
+| Section | Original stage | Content | Purpose |
 | --- | --- | --- | --- |
-| `evidence` | `symbol_prior` | B1–B8，传统验时辰线索 | `rectification_matching` |
-| `evidence` | `event_backtest` | C1–C9，本人提供的重大年份经历 | `rectification_matching` |
-| `context` | `context_box` | D1–D10，家庭背景、路径、偏好与关注事项 | `contextual_analysis` |
+| `evidence` | `symbol_prior` | B1–B8: traditional birth-time rectification clues | `rectification_matching` |
+| `evidence` | `event_backtest` | C1–C9: self-reported major life events and their years | `rectification_matching` |
+| `context` | `context_box` | D1–D10: family background, life paths, preferences, and concerns | `contextual_analysis` |
 
-`event_backtest` 是保留的阶段 ID，不代表本模块已完成回测，更不代表用户提供的既往经历是独立验证结果。
+`event_backtest` is a retained stage ID. It does not mean that this module has performed a backtest, or that the user's past experiences constitute independent validation results.
 
-## 题库与 UI
+## Question Bank and UI
 
-`getQuestionnaire(): Questionnaire` 返回题库的独立副本。修改这个返回对象不会改变服务端校验规则。题目文字、选项、适用条件和长度限制全部来自 `configs/question_bank.v1.json`；UI 不另设题目定义。
+`getQuestionnaire(): Questionnaire` returns an independent copy of the bank. Changing that object does not change the validation rules. All question wording, options, applicability conditions, and length limits come from `configs/question_bank.v1.json`; the UI does not define a separate question set.
 
-每个题目至少包括 `id`、`label`、`type`、`stage`、`stageLabel`、`purpose`、`required` 和 `sourceRequired`。类型有 `single_choice`、`multi_choice`、`short_text`、`year_event_list`；模块亦支持单条 `year_event`，当前题库未使用它。选项统一为 `{ id, label }`，条件存放在 `condition`。事件输入框标签在 `eventFields`，统一回复状态在 `answerStatuses`。
+Each question includes at least `id`, `label`, `type`, `stage`, `stageLabel`, `purpose`, `required`, and `sourceRequired`. Types include `single_choice`, `multi_choice`, `short_text`, and `year_event_list`. The module also supports a single `year_event`, although the current bank does not use it. Options use `{ id, label }`, and conditions are stored in `condition`. Event-input labels are in `eventFields`, and shared response states are in `answerStatuses`.
 
-题库另有两道可选 `applicabilityQuestions`，用于明确 C7 工作经历、C8 子女或生育经历是否适用。它们的 UI 选项 ID 是字符串 `"true"`、`"false"`、`"unknown"`，提交时前两项需转换成布尔值；缺失记为 `unknown`。
+The bank also contains two optional `applicabilityQuestions`, establishing whether C7 work history and C8 childbearing or parenting experiences apply. Their UI option IDs are the strings `"true"`, `"false"`, and `"unknown"`; the first two must be converted to booleans when submitted. Missing values become `unknown`.
 
-## 提交格式
+## Submission Format
 
-`POST /api/session` 的 `answers` 可完全省略，也可为 `{}` 或包含部分 `responses` / `applicability` 的对象；不能用 null、数组等替代对象。以下类型描述规范化后的内部结构，不能理解为要求用户填写所有字段：
+The `answers` field in `POST /api/session` may be omitted entirely, supplied as `{}`, or contain only some `responses` and/or `applicability` fields. Null, arrays, and other non-object values are rejected. The following types describe the normalized internal structure; they do not require users to fill every field:
 
 ```ts
 type Answer =
@@ -39,7 +39,7 @@ type Answer =
 interface YearEvent {
   year: number;
   description: string;
-  date?: string;      // YYYY-MM-DD，仅在确切知道日期时填写
+  date?: string;      // YYYY-MM-DD; supply only when the exact date is known
   eventType?: string;
 }
 
@@ -52,28 +52,28 @@ interface QuestionnaireAnswers {
 }
 ```
 
-单选 `value` 使用原选项 ID；多选使用无重复的 ID 数组；文本使用字符串；事件题使用事件数组。C9 必须为每条事件选择 `eventType: "best_year" | "worst_year"`。其他事件题可以省略 `eventType`；填写时必须与题目固定类型一致。
+A single-choice `value` uses the original option ID; multiple-choice answers use an array of distinct IDs; text answers use strings; event questions use arrays of events. Every C9 event must specify `eventType: "best_year" | "worst_year"`. Other event questions may omit `eventType`; when supplied, it must match the question's fixed event type.
 
-以下是部分回答片段；将其放入 `answers.responses` 即可提交，其余问题留空：
+This partial response can be submitted inside `answers.responses`, leaving the remaining questions blank:
 
 ```json
 {
   "C1_major_turning_years": {
     "status": "answered",
-    "value": [{ "year": 2020, "description": "合成示例：改变学习方向" }]
+    "value": [{ "year": 2020, "description": "Synthetic example: changed field of study" }]
   },
   "B1_hair_whorl": { "status": "unknown" },
   "C8_childbearing_years": { "status": "not_applicable" }
 }
 ```
 
-条件为 `false` 时，缺失的对应题目规范化为 `not_applicable`；若主动填写，也只能是该状态。条件为 `true` 或 `unknown` 时，缺失回答规范化为 `unknown`。非条件题同样可省略。已回答的职业身份若明确表明工作经历，则不能把工作适用性标成 `false`。这些依赖规则也定义在 JSON 中。
+When a condition is `false`, an omitted dependent response becomes `not_applicable`; an explicitly supplied response must also use that state. When the condition is `true` or `unknown`, an omitted response becomes `unknown`. Questions without conditions may also be omitted. If the supplied occupational-identity answer clearly indicates work experience, work applicability cannot be marked `false`. These dependency rules are also defined in JSON.
 
-所有题留空或回复 `unknown` 均可继续两阶段 AI 流程，但不能据此声称找准时辰。单候选直接成为暂定工作盘；多候选弱证据时仍暂定选择并说明把握度有限。没有已知校盘或背景材料时，报告使用 `chart_only`；有已知材料时使用 `context_supported`。两者都不代表预测已验证，更不是概率。
+Leaving every question blank or answering `unknown` still permits the two-stage AI workflow, but does not establish a correct birth time. A single candidate becomes the provisional working chart. With multiple candidates and weak evidence, the workflow still makes a provisional selection and explains the limited confidence. Reports use `chart_only` when no substantive chart-comparison or context information is available, and `context_supported` when it is. Neither label implies validated predictions or a probability estimate.
 
-## 严格校验
+## Strict Validation
 
-公开流程先调用 `normalizeAnswers(answers?, birth?)` 补齐状态，再用下列 `validateAnswers` 校验规范化对象。`missingQuestionIds` 用于内部完整结构检查，不表示网页用户必须回答全部问题。无效的已填内容仍会被拒绝。
+The public workflow first calls `normalizeAnswers(answers?, birth?)` to populate missing states, then uses `validateAnswers` below to validate the normalized object. `missingQuestionIds` checks the completeness of the internal structure; it does not require website users to answer every question. Invalid supplied content is still rejected.
 
 ```ts
 validateAnswers(answers: unknown, birth?: {
@@ -86,29 +86,29 @@ validateAnswers(answers: unknown, birth?: {
 }
 ```
 
-上层先生成候选集，再传入转换后的公历生日 `{ birthDate: candidateSet.candidates[0].features.solarDate, asOfDate: 会话评估ISO日期 }`，不能把原始农历日期直接作为公历校验。缺少 `asOfDate` 时使用服务器当前 UTC 日期；测试传固定参考日期保证可重复。校验不接受出生对象的其他字段，避免把整份出生表单误传后静默忽略。
+The caller first generates the candidate set, then supplies the converted Gregorian birth date as `{ birthDate: candidateSet.candidates[0].features.solarDate, asOfDate: sessionAssessmentISODate }`. A raw lunar date must not be treated as Gregorian. If `asOfDate` is absent, validation uses the runtime's current UTC date; tests pass a fixed reference date for reproducibility. Other fields in this birth-context object are rejected, preventing a full birth form from being passed accidentally and silently ignored.
 
-- 问卷、适用性、回答、事件均检查未知字段；旧 A 组和未知题目 ID 不能进入 `responses`。
-- `unknown` / `not_applicable` 不能携带 `value`。空字符串、空事件数组和空多选数组不能伪装为已回答。
-- 单选和多选只能使用题库 ID；多选不重复、不超限，原“不确定”选项不能与实质选项并选。
-- 文本不能只含空白、含非法控制字符或超过题目上限；事件描述上限 400 个 JavaScript UTF-16 code units。
-- 年份必须是整数，处于出生年与参考年之间。未传出生日期时，下限来自题库 `limits.minimumDate`（当前为 `1900-01-01`）。不会将字符串年份、空值或未知值转换成数字。
-- 可选日期必须是严格 `YYYY-MM-DD`、真实公历日期、年份相符，且不早于出生日期、不晚于参考日期；闰日按公历规则核对。
-- 只有年份时保留年份精度，不补月份或日。发生在出生年但不知确切日期的事件无法进一步判断是否早于生日，也不会伪造更精确结论。
-- 同一题内完全相同的事件拒绝重复；跨题同一经历可能有不同用途，本模块不把它们计算成多次独立命中。
+- Unknown fields are checked in questionnaire, applicability, answer, and event objects. Old group A fields and unknown question IDs are not accepted in `responses`.
+- `unknown` and `not_applicable` must not carry a `value`. Empty strings, event arrays, and multiple-choice arrays cannot be presented as answered content.
+- Single- and multiple-choice answers must use IDs from the bank. Multiple-choice IDs must be distinct and within the count limit; original "uncertain" options cannot be combined with substantive choices.
+- Text must not consist only of whitespace, contain prohibited control characters, or exceed the question's limit. Event descriptions are limited to 400 JavaScript UTF-16 code units.
+- Years must be integers between the birth year and the reference year. Without a birth date, the lower bound comes from `limits.minimumDate`, currently `1900-01-01`. String years, nulls, and unknown values are not coerced to numbers.
+- An optional date must be a valid Gregorian date in strict `YYYY-MM-DD` format, agree with the event year, and fall between the birth date and reference date. Leap days are checked against Gregorian rules.
+- Year-only events retain year-level precision; no month or day is invented. An event in the birth year without an exact date cannot be checked more precisely for whether it preceded the birthday.
+- Identical events within one question are rejected as duplicates. The same experience may serve different purposes across questions; this module does not count those references as multiple independent hits.
 
-未知年份不填猜测值，应将该题标为 `unknown`；没有该类经历可标为 `not_applicable`。本模块不推测缺失内容。
+Do not guess an unknown year; mark the question `unknown`. If that type of experience does not apply, use `not_applicable`. The module does not infer missing content.
 
-## 结构化证据
+## Structured Evidence
 
-`buildEvidence(answers?, birth?)` 先规范化缺失状态并使用同一校验器，失败时抛出 `QuestionnaireValidationError`，其中 `issues` 提供结构化错误。有效输入返回 `{ evidence, context }`，每条包含：
+`buildEvidence(answers?, birth?)` first normalizes missing states and applies the same validator. On failure, it throws `QuestionnaireValidationError`, whose `issues` field contains structured errors. Valid input returns `{ evidence, context }`, with each item containing:
 
 ```ts
 {
-  id: string;                     // 原题目 ID，稳定引用
-  label: string;                  // 原题目文字
-  answer: Answer;                 // 已填回复的副本，或规范化后的缺失状态
-  answerLabels?: string[];        // 单选/多选的原选项文字
+  id: string;                     // Original question ID, used as a stable reference
+  label: string;                  // Original question wording
+  answer: Answer;                 // Copy of the supplied answer, or normalized missing state
+  answerLabels?: string[];        // Original single-/multiple-choice option labels
   stage: "symbol_prior" | "event_backtest" | "context_box";
   purpose: "rectification_matching" | "contextual_analysis";
   source: "user_report";
@@ -117,13 +117,13 @@ validateAnswers(answers: unknown, birth?: {
 }
 ```
 
-`informationStatus: "known"` 仅表示提供了实质回答，不表示该回答已经核实为真。旧选项中的 `unknown`、`complex_unknown`、`varies_unknown`、`prefer_not_to_say` 通过题库 `unknownOptionIds` 归为 `unknown`，同时保留原始选项 ID。缺失题仍有明确的 unknown / not_applicable 状态记录，但没有虚构实质答案，不能引用为已知个人事实。
+`informationStatus: "known"` means only that a substantive answer was supplied, not that it has been verified as true. Original options `unknown`, `complex_unknown`, `varies_unknown`, and `prefer_not_to_say` are classified as `unknown` through the bank's `unknownOptionIds`, while retaining their original option IDs. Omitted questions still have an explicit unknown or not-applicable state, but no substantive answer is fabricated, and these states cannot be cited as known personal facts.
 
-模型可以用稳定 ID 说明支持与反证，但这些仍是本次选择工作盘所使用的材料。再次引用同一回答不能作为“选准了”的独立验证；若要评估效果，需要另行保留可靠出生时辰或未参与选择的独立经历。本模块不输出分数、概率或命中率。
+The model can use stable IDs to describe supporting and contradictory evidence, but that material has already participated in selecting the working chart. Citing it again cannot independently validate the selection. Evaluation would require separately held, reliable birth times or independent experiences not used in selection. This module outputs no scores, probabilities, or hit rates.
 
-## 验证范围
+## Validation Scope
 
-`tests/questionnaire.test.ts` 使用纯合成数据检查可选输入、缺失规范化、内部完整性、条件适用、未知状态、字段拒绝、选项与长度边界、日期和年份、事件类型、重复事件、证据用途及副本隔离。测试不使用真实命例、不请求模型，也不能证明命理判断有效。
+`tests/questionnaire.test.ts` uses entirely synthetic data to check optional inputs, missing-value normalization, internal completeness, applicability, unknown states, field rejection, option and length limits, dates and years, event types, duplicate events, evidence purposes, and copy isolation. These tests use no real personal cases, make no model requests, and cannot establish the validity of divination judgments.
 
 ```sh
 node --test tests/questionnaire.test.ts

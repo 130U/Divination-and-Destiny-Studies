@@ -18,6 +18,7 @@ Work only in this repository. The user's `130U/bazi-context-agent` is a read-onl
 - Do not silently substitute mock results for a requested real model call.
 - Use synthetic fixtures for automated tests; mark live checks separately. Run `npm run check` after changes and report limits honestly.
 - Keep README focused on user outcomes and link installation details separately. Use actual UI captures, and verify the public HTTPS route and browser flow before claiming deployment acceptance. Keep historical local checks separate from current public-site checks.
+- Write repository documentation, source comments, provenance notes, and GitHub metadata in English. The product interface, questionnaire, model instructions, and generated reports currently use Simplified Chinese; preserve their language and behavior unless a product localization change is explicitly requested. Keep vendored upstream files byte-for-byte intact.
 - No unrelated divination systems, payments, accounts, or social features in this MVP.
 
 ## Completion

@@ -1,69 +1,69 @@
-# 使用与本地运行
+# Using the App and Running It Locally
 
-## 在线版：使用自己的 DeepSeek Key
+## Online mode: use your own DeepSeek key
 
-打开 [在线页面](https://www.theodoreoy.com/Divination-and-Destiny-Studies/)。填写出生资料后即可生成候选；27 道背景问题和 2 道适用性确认全部可选。公历、农历及闰月均支持，时间可填写准确分钟、同日范围或全天未知。产品出生日期范围为转换后的公历 1900-01-01 至评估当天。
+Open the [online app](https://www.theodoreoy.com/Divination-and-Destiny-Studies/). Birth details are sufficient to generate candidates; all 27 background questions and both applicability questions are optional. The app supports Gregorian dates, lunar dates, and leap lunar months. Birth time may be an exact minute, a range within the same day, or entirely unknown. The product accepts birth dates whose converted Gregorian date falls between 1900-01-01 and the assessment date.
 
-AI 分析需要你自己的 DeepSeek API Key。网页在 HTTPS 环境中接收 Key，并只保存在当前标签页的闭包内存；不写入 localStorage、sessionStorage、URL、日志或导出报告。刷新、主动清除或页面离开事件会清空 Key；更换或清除 Key 也会清空当前会话、缓存并取消本地等待。清除不能撤回 DeepSeek 已经收到的请求，也不能保证已经发生的费用被取消。
+AI analysis requires your own DeepSeek API key. The HTTPS page accepts the key and keeps it only in the current tab's closure memory. It is never written to localStorage, sessionStorage, URLs, logs, or exported reports. Refreshing, explicitly clearing, or leaving the page clears the key. Replacing or clearing it also clears the current session and cache and cancels local waiting. Clearing cannot withdraw requests already received by DeepSeek or guarantee cancellation of charges already incurred.
 
-出生计算和会话管理在浏览器中完成。只有点击 AI 操作时，浏览器才携带该 Key 直连 `https://api.deepseek.com/chat/completions`；不经过作者的模型后端，不消耗作者账户额度。Key 作为官方请求的认证凭据发送给 DeepSeek，出生资料、候选盘和相关回答也会随分析请求发送。
+Birth-chart calculation and session management run in the browser. Only an explicit AI action sends a request with your key directly to `https://api.deepseek.com/chat/completions`. Requests do not pass through the author's model backend or consume the author's account quota. The key is sent to DeepSeek as the official request's authentication credential. Birth details, candidate charts, and relevant answers also accompany analysis requests.
 
-默认使用 `deepseek-flash` + `medium`。填写 Key 本身不调用模型，也不表示已通过认证或账户有余额。网络、浏览器跨域限制、余额或限流可能使请求失败；系统会显示错误，不自动付费重试，也不返回模拟报告。
+The default is `deepseek-flash` + `medium`. Entering a key does not call the model and does not establish that authentication will succeed or the account has a balance. Network problems, browser CORS restrictions, insufficient balance, or rate limits may cause requests to fail. The app displays errors, never retries paid requests automatically, and does not return simulated reports.
 
-正常流程包含两次模型请求：先比较候选，再分析工作盘。单候选直接成为暂定工作盘；背景全空也可继续，报告会说明只依据命盘。有效会话内的成功比较，以及同一工作盘的成功分析会缓存。换盘、新建会话或手动重试可能产生新费用。
+The normal workflow makes two model requests: first compare candidates, then analyze the working chart. A single candidate becomes the provisional working chart directly. Entirely blank background answers still allow analysis, with the report identifying its chart-only basis. Successful comparisons and successful analyses of the same working chart are cached within a valid session. Running AI again after changing charts or creating a new session, or explicitly retrying a failed request, may incur new charges.
 
-会话从创建起 30 分钟过期；在线版刷新或关闭页面也会丢失。需要保留结果时可主动导出 JSON 或 Markdown。页面和导出的 usage 仅描述对应的那一次模型调用，不含其他阶段、此前失败或重试，不是账户累计账单；缓存展示原调用用量，不能重复累计。
+Sessions expire 30 minutes after creation. In online mode, refreshing or closing the page also loses the session. Export JSON or Markdown explicitly if you want to keep the results. Usage shown on the page and in exports describes only the associated model call. It excludes other stages, earlier failures, and retries, and is not a cumulative account bill. Cached results display the original call's usage, which must not be counted again.
 
-## 本机 Node 版：运行者配置服务端 Key
+## Local Node mode: the operator configures a server key
 
-本机版保留相同分析流程，但使用 Node 服务端环境中的 Key，不接收访客从网页提交的 Key。服务默认只监听本机 `127.0.0.1`；这与公开静态浏览器版的访客自带 Key 是两种运行模式。
+Local mode retains the same analysis workflow but uses a key from the Node server environment. It does not accept visitors' keys through the web page. By default, the server listens only on local `127.0.0.1`. This is a separate runtime mode from the public static browser app, where visitors supply their own keys.
 
-需要 Node.js **24.12.0 或更新的 24.x 版本**和 npm，依赖版本由锁文件固定：
+You need Node.js **24.12.0 or a newer 24.x release** and npm. Dependency versions are pinned in the lockfile:
 
 ```sh
 npm ci
 npm start
 ```
 
-打开 [本机页面](http://127.0.0.1:3210)。这个地址指向你自己的电脑，只有本机服务启动后才有效，不是公开网站。未配置 Key 时仍可填写资料和生成本地候选；AI 操作明确报错，不会返回模拟结果。
+Open the [local app](http://127.0.0.1:3210). This address points to your own computer and works only after the local server starts; it is not a public website. Without a key, you can still enter details and generate local candidates. AI operations fail explicitly rather than return simulated results.
 
-将 `.env.example` 复制为本地 `.env`，用编辑器填写服务端配置并重启。也可直接使用进程环境变量。`.env` 已被 Git 忽略；不要将密钥放进仓库、截图、终端命令历史或报告。
+Copy `.env.example` to a local `.env`, edit the server configuration, and restart. You may instead set process environment variables directly. Git ignores `.env`. Never put keys in the repository, screenshots, terminal command history, or reports.
 
-| 环境变量 | 用途 | 默认值 |
+| Environment variable | Purpose | Default |
 | --- | --- | --- |
-| `DEEPSEEK_API_KEY` | 本机服务读取的凭据 | 未配置 |
-| `DEEPSEEK_MODEL` | 请求模型名 | `deepseek-flash` |
-| `DEEPSEEK_THINKING` | `low`、`medium`、`high`、`max` 或 `disabled` | `medium` |
-| `PORT` | 本机监听端口 | `3210` |
+| `DEEPSEEK_API_KEY` | Credential read by the local server | Not configured |
+| `DEEPSEEK_MODEL` | Requested model name | `deepseek-flash` |
+| `DEEPSEEK_THINKING` | `low`, `medium`, `high`, `max`, or `disabled` | `medium` |
+| `PORT` | Local listening port | `3210` |
 
-自行克隆运行使用各自配置的 Key。若另行将 Node 后端开放给别人，他们触发的请求会使用运营者的 Key；当前公开网页没有采用这种共享后端模式，也不提供多人账户隔离。
+People who clone and run the project use their own configured keys. If someone separately exposes a Node backend to other users, their requests use the operator's key. The current public website does not use that shared-backend model, and the project does not provide multi-user account isolation.
 
-## 模型、费用与数据边界
+## Models, charges, and data boundaries
 
-截至 2026-10-28，[官方模型说明](https://api-docs.deepseek.com/)将 `deepseek-flash` 对应到 DeepSeek-V4.1-Flash-1017。这是可更新的服务商别名，不是永久锁定的快照。[官方思考映射](https://api-docs.deepseek.com/guides/thinking_mode/)将请求值 `medium` 对应到实际 `high`；本项目原样发送 `medium`。
+As of 2026-10-28, the [official model documentation](https://api-docs.deepseek.com/) maps `deepseek-flash` to DeepSeek-V4.1-Flash-1017. This is an updatable provider alias, not a permanently pinned snapshot. The [official thinking-level mapping](https://api-docs.deepseek.com/guides/thinking_mode/) maps a requested value of `medium` to an effective level of `high`; this project sends `medium` unchanged.
 
-两种模式都使用固定官方接口，每个业务阶段输出上限为 8,192 tokens，不允许表单指定任意服务地址。模型费用由提供方计费决定，当前没有金额级消费上限。失败或超时仍可能已产生费用。模型完成响应后若业务校验失败，会保留已取得的安全用量；未取得 usage 不能解释为零费用。
+Both modes use the fixed official endpoint and an output limit of 8,192 tokens per business stage. Forms cannot specify arbitrary service addresses. Charges are determined by the provider, and there is currently no monetary spending cap. Failed or timed-out requests may still incur charges. If a completed model response fails business validation, any safe usage metadata already received is retained. Missing usage does not mean zero cost.
 
-轻微引用格式问题会保留正文并警告；候选身份错误或缺少必要正文仍会失败。模型建议只是待核对的工作假设，不是经过校准的时辰概率。用户已提供的经历不能当作独立预测命中。
+Minor reference-format problems preserve the report text and produce warnings. Candidate-identity errors or missing essential text still cause failure. Model recommendations are working hypotheses to examine, not calibrated probabilities for a birth hour. Events already supplied by the user cannot count as independent prediction successes.
 
-## 开发检查与静态构建
+## Development checks and static builds
 
 ```sh
 npm run check
 npm run build:web
 ```
 
-`check` 执行 TypeScript、合成数据测试及 vendor 完整性校验，不请求真实模型；本地 HTTP 测试需要 loopback 权限。`build:web` 将同一排盘、问卷与工作流打包到 `dist/`，并复制静态资源和许可文件；不复制 `.env`、私人报告或服务端凭据。静态产物需通过支持 HTTPS 的站点访问，不能以本机 Node API 是否可达判断在线版状态。
+`check` runs TypeScript checks, synthetic-data tests, and vendor integrity verification without requesting a real model. Local HTTP tests require loopback access. `build:web` bundles the same calendar calculation, questionnaire, and workflow into `dist/`, and copies static assets and license files. It does not copy `.env`, private reports, or server credentials. Serve the static output through an HTTPS-capable site. Availability of the local Node API does not establish the status of online mode.
 
-独立真实 API 脚本需要主动执行，成功路径会发出两次付费请求：
+The standalone live API script must be invoked explicitly. A successful run makes two paid requests:
 
 ```sh
 npm run test:live
 npm run test:live -- --birth-only --single-candidate
 ```
 
-两个命令是可选方案，不需连续执行。后者使用背景留空、准确分钟的单候选合成输入。脚本每次运行最多两次尝试，不自动重试；未配置时输出 `LIVE_NOT_RUN`。历史记录不表示该参数组合或当前公开网页已经另行实测。
+These commands are alternatives; there is no need to run both consecutively. The second uses synthetic input with blank background answers and one candidate at an exact minute. Each script run allows at most two attempts, does not retry automatically, and reports `LIVE_NOT_RUN` when unconfigured. Historical records do not mean this argument combination or the current public website has been separately tested live.
 
-0.2.0 的 90 项离线测试与本机浏览器两阶段真实调用、0.1.0 的早期样例分别记录在 [验证记录](VALIDATION.md)。这些是对应版本的工程验收，不自动证明 0.3.0 公网部署可用，也不证明命理解释或预测有效。当前部署与浏览器直连结果以明确记录的对应版本验收为准。
+The [validation record](VALIDATION.md) separately documents the 90 offline tests and two-stage live local-browser run for 0.2.0, and the earlier 0.1.0 example. These are engineering acceptance checks for their respective versions. They do not automatically establish that the 0.3.0 public deployment works, or validate BaZi interpretations or predictions. Deployment and direct-browser claims must follow the explicitly recorded acceptance checks for the relevant version.
 
-更多说明：[API 契约](API.md)、[架构](ARCHITECTURE.md)、[DeepSeek 接入](DEEPSEEK.md)、[问卷](QUESTIONNAIRE.md)、[历法口径](ZHENYI_INTEGRATION.md)。
+Further documentation: [API contract](API.md), [architecture](ARCHITECTURE.md), [DeepSeek integration](DEEPSEEK.md), [questionnaire](QUESTIONNAIRE.md), and [calendar conventions](ZHENYI_INTEGRATION.md).
