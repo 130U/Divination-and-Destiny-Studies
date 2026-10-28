@@ -40,6 +40,6 @@ const result = await client.completeJson({
 
 `node --test tests/deepseek.test.ts` 使用注入的 fake fetch；涵盖配置、请求形状、实际 usage 映射、缺 key、401、无重试、网络异常脱敏、请求和响应体超时、响应大小、截断及 JSON 拒绝。测试不调用真实 API，不安装依赖。
 
-服务层负责：业务 schema；上下文可见性；已锁定四柱不变；确定性校盘与 AI 阶段隔离；每轮总 token/费用预算；请求频率；对用户明确显示真实或测试模式。不要把本客户端放入禁止联网的排盘 adapter。
+服务层负责业务结构校验、上下文可见性、已锁定四柱不变、本地历法计算与 AI 候选比较的职责分离，以及输入长度、输出 token 上限、并发与缓存控制。实际用量来自提供方响应；当前没有金额级消费上限。生产流程只接受真实提供方结果，测试客户端仅在自动化测试中注入。不要把本客户端放入禁止联网的排盘 adapter。
 
 官方接口依据：[Chat Completion](https://api-docs.deepseek.com/api/create-chat-completion)、[JSON Output](https://api-docs.deepseek.com/guides/json_mode)、[Thinking Mode](https://api-docs.deepseek.com/guides/thinking_mode)。本次实现未执行真实 API 冒烟测试。
