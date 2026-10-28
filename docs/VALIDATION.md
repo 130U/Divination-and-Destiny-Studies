@@ -13,6 +13,15 @@
 - 浏览器本地静态预览已验证零背景单盘生成、Key 输入框配置后清空、未验证状态、无效 Key 的官方认证错误及资料保留。
 - 对公开 Origin `https://www.theodoreoy.com` 的真实响应通过 CORS 核对；项目网站已配置强制 HTTPS。
 
+### 公网发布与页面验收
+
+0.3.0 实现提交 `ed667d7` 的 [Windows / Linux 检查](https://github.com/130U/Divination-and-Destiny-Studies/actions/runs/40714096462)与 [Pages 发布](https://github.com/130U/Divination-and-Destiny-Studies/actions/runs/40714096272)均成功。公开入口为 [www.theodoreoy.com/Divination-and-Destiny-Studies](https://www.theodoreoy.com/Divination-and-Destiny-Studies/)，已启用强制 HTTPS。
+
+- 首页、应用脚本、浏览器 bundle、样式与第三方许可均返回 HTTP 200。HTML、两个脚本和完整第三方许可与本机产物字节一致；CSS 仅 Windows / Git 的 CRLF 与 LF 换行有差异，规范化后内容一致。
+- 在真实公网页面填写纯合成出生资料（2000-06-15 09:30、Asia/Shanghai、女、经度 121.47、关闭真太阳时），27 项背景全部留空，成功生成一个候选：庚辰、壬午、甲辰、己巳。无 Key 时 AI 按钮禁用，没有假报告。
+- GitHub 已渲染产品 README、真实截图和公开 HTTPS 入口；About 的描述与 homepage 经远端接口读回确认。
+- 公开页面的有效 Key 两阶段点击流程没有另行重复付费验收；下文记录的是实际发布 bundle 在 Node 中的真实调用。本地静态预览已单独验证浏览器官方认证错误与清除 Key 行为。
+
 ### 发布包的真实模型检查
 
 `npm run test:web:live` 将 **实际的 dist/browser.js** 加载到 Node，使用本机测试凭据与纯合成出生资料，并发送公开网站的 Origin 头。它验证浏览器发布包的两阶段行为和认证响应的 CORS 头，**不是在浏览器 UI 中输入真实 Key 的验收**。最多两次请求，没有自动重试；Key 和模型原始正文不记录到输出。
