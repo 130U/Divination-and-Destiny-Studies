@@ -29,7 +29,7 @@ test("unconfigured client explicitly fails without invoking fetch", async () => 
   assert.equal(called, false);
 });
 
-test("low-thinking JSON request uses fixed endpoint, bounded tokens and reads actual usage", async () => {
+test("default medium-thinking JSON request uses fixed endpoint, bounded tokens and reads actual usage", async () => {
   let calls = 0;
   const client = createDeepSeekClient({ env, fetchImpl: async (url, init) => {
     calls++;
@@ -42,7 +42,7 @@ test("low-thinking JSON request uses fixed endpoint, bounded tokens and reads ac
     assert.equal(sent.stream, false);
     assert.deepEqual(sent.response_format, { type: "json_object" });
     assert.deepEqual(sent.thinking, { type: "enabled" });
-    assert.equal(sent.reasoning_effort, "low");
+    assert.equal(sent.reasoning_effort, "medium");
     assert.equal(sent.max_tokens, 4096);
     assert.equal("temperature" in sent, false);
     assert.equal(String(init?.body).includes(env.DEEPSEEK_API_KEY), false);
@@ -56,6 +56,34 @@ test("low-thinking JSON request uses fixed endpoint, bounded tokens and reads ac
   assert.equal(result.model, "deepseek-flash");
   assert.equal(result.requestId, "request_fixture_1");
   assert.ok(result.durationMs >= 0);
+});
+
+test("explicit reasoning modes reach the provider unchanged and are configured", async () => {
+  for (const thinking of ["low", "medium", "high", "max"] as const) {
+    const configuredEnv = { ...env, DEEPSEEK_THINKING: thinking };
+    assert.equal(getDeepSeekStatus(configuredEnv).configured, true);
+    let calls = 0;
+    const client = createDeepSeekClient({ env: configuredEnv, fetchImpl: async (_url, init) => {
+      calls++;
+      const sent = JSON.parse(String(init?.body));
+      assert.equal(sent.model, "deepseek-flash");
+      assert.deepEqual(sent.thinking, { type: "enabled" });
+      assert.equal(sent.reasoning_effort, thinking);
+      return response();
+    } });
+    await client.completeJson(request);
+    assert.equal(calls, 1);
+  }
+});
+
+test("explicit medium option overrides a low environment without downgrading", async () => {
+  const client = createDeepSeekClient({ env: { ...env, DEEPSEEK_THINKING: "low" }, thinking: "medium", fetchImpl: async (_url, init) => {
+    const sent = JSON.parse(String(init?.body));
+    assert.deepEqual(sent.thinking, { type: "enabled" });
+    assert.equal(sent.reasoning_effort, "medium");
+    return response();
+  } });
+  await client.completeJson(request);
 });
 
 test("disabled thinking omits effort and accepts a lower output budget", async () => {
@@ -72,6 +100,9 @@ test("disabled thinking omits effort and accepts a lower output budget", async (
 test("invalid config and excessive tokens fail before transport", async () => {
   let calls = 0;
   const fetchImpl: typeof fetch = async () => { calls++; return response(); };
+  assert.equal(getDeepSeekStatus({ ...env, DEEPSEEK_THINKING: "unbounded" }).configured, false);
+  assert.equal(getDeepSeekStatus({ ...env, DEEPSEEK_THINKING: "" }).configured, false);
+  await assert.rejects(createDeepSeekClient({ env: { ...env, DEEPSEEK_THINKING: "" }, fetchImpl }).completeJson(request), errorCode("INVALID_CONFIG"));
   await assert.rejects(createDeepSeekClient({ env: { ...env, DEEPSEEK_MODEL: "invalid secret value" }, fetchImpl }).completeJson(request), errorCode("INVALID_CONFIG"));
   await assert.rejects(createDeepSeekClient({ env: { ...env, DEEPSEEK_THINKING: "unbounded" }, fetchImpl }).completeJson(request), errorCode("INVALID_CONFIG"));
   await assert.rejects(createDeepSeekClient({ env, fetchImpl }).completeJson({ ...request, maxOutputTokens: MAX_DEEPSEEK_OUTPUT_TOKENS + 1 }), errorCode("INVALID_REQUEST"));

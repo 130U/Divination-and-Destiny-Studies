@@ -7,11 +7,13 @@
 在 Windows、Node.js 24.16.0 下运行 `npm run check`：
 
 - TypeScript 检查通过。
-- 73 项测试通过：历法 21 项、DeepSeek 传输 13 项、问卷 22 项、本地 HTTP 接口 3 项、工作流 14 项。
+- 75 项测试通过：历法 21 项、DeepSeek 传输 15 项、问卷 22 项、本地 HTTP 接口 3 项、工作流 14 项。
 - 5 份未修改的真一上游文件通过 SHA-256 和 Git blob SHA-1 完整性核验。
 - `node --check public/app.js` 通过。
 
 测试包括节气边界、农历换算、真太阳时、DST 缺口及重复时间、完整问卷、无效模型引用、缓存、并发、过期清理和错误处理。HTTP 测试须允许本机 loopback 连接。模型测试使用受控假客户端，不访问真实 API；应用没有假报告回退。
+
+2026-10-28 配置更新：默认模型仍为 `deepseek-flash`（该日官方对应 DeepSeek-V4.1-Flash-1017），默认推理参数改为 `medium`。传输测试确认默认与显式配置均将 `reasoning_effort: "medium"` 原样发送，没有降为 `low` 或关闭思考。官方将 `medium` 映射为实际 `high`；这项映射由提供方文档说明，离线测试不证明真实服务实际执行情况。
 
 ## 浏览器检查
 

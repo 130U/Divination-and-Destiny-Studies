@@ -1,8 +1,10 @@
 export const DEEPSEEK_ENDPOINT = "https://api.deepseek.com/chat/completions";
 export const DEFAULT_DEEPSEEK_MODEL = "deepseek-flash";
+export const DEFAULT_DEEPSEEK_THINKING = "medium";
 export const MAX_DEEPSEEK_OUTPUT_TOKENS = 8192;
 
-export type DeepSeekThinking = "low" | "disabled";
+export type DeepSeekThinking = "low" | "medium" | "high" | "max" | "disabled";
+const THINKING_MODES: readonly string[] = ["low", "medium", "high", "max", "disabled"];
 export interface DeepSeekEnvironment {
   DEEPSEEK_API_KEY?: string;
   DEEPSEEK_MODEL?: string;
@@ -74,7 +76,7 @@ export function getDeepSeekStatus(env: DeepSeekEnvironment = process.env): {
   configured: boolean; provider: "deepseek"; model: string;
 } {
   const model = modelFrom(env);
-  const validThinking = !env.DEEPSEEK_THINKING || ["low", "disabled"].includes(env.DEEPSEEK_THINKING);
+  const validThinking = THINKING_MODES.includes(env.DEEPSEEK_THINKING ?? DEFAULT_DEEPSEEK_THINKING);
   return { configured: Boolean(env.DEEPSEEK_API_KEY?.trim() && model && validThinking), provider: "deepseek", model: model ?? DEFAULT_DEEPSEEK_MODEL };
 }
 
@@ -140,10 +142,10 @@ export function createDeepSeekClient(options: DeepSeekOptions = {}): { completeJ
       const apiKey = env.DEEPSEEK_API_KEY?.trim();
       if (!apiKey) throw new DeepSeekError("NOT_CONFIGURED");
       const model = modelFrom(env);
-      const thinking = options.thinking ?? env.DEEPSEEK_THINKING ?? "low";
+      const thinking = options.thinking ?? env.DEEPSEEK_THINKING ?? DEFAULT_DEEPSEEK_THINKING;
       const timeoutMs = options.timeoutMs ?? 120_000;
       const maxBytes = options.maxResponseBytes ?? 1024 * 1024;
-      if (!model || !["low", "disabled"].includes(thinking) || !Number.isSafeInteger(timeoutMs) || timeoutMs < 1 ||
+      if (!model || !THINKING_MODES.includes(thinking) || !Number.isSafeInteger(timeoutMs) || timeoutMs < 1 ||
           !Number.isSafeInteger(maxBytes) || maxBytes < 1) throw new DeepSeekError("INVALID_CONFIG");
       const maxTokens = request.maxOutputTokens ?? options.maxOutputTokens ?? 4096;
       if (typeof request.system !== "string" || !request.system.trim() || !/json/i.test(request.system) ||
@@ -153,8 +155,8 @@ export function createDeepSeekClient(options: DeepSeekOptions = {}): { completeJ
         const payload = JSON.stringify(request.payload);
         if (payload === undefined) throw new Error();
         body = JSON.stringify({ model, stream: false, response_format: { type: "json_object" }, max_tokens: maxTokens,
-          thinking: { type: thinking === "low" ? "enabled" : "disabled" },
-          ...(thinking === "low" ? { reasoning_effort: "low" } : {}),
+          thinking: { type: thinking === "disabled" ? "disabled" : "enabled" },
+          ...(thinking === "disabled" ? {} : { reasoning_effort: thinking }),
           messages: [{ role: "system", content: request.system }, { role: "user", content: payload }] });
       } catch { throw new DeepSeekError("INVALID_REQUEST"); }
       const started = performance.now();

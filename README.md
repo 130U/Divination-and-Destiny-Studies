@@ -31,10 +31,12 @@ npm start
 | --- | --- | --- |
 | `DEEPSEEK_API_KEY` | 仅服务端读取的 API 凭据 | 未配置 |
 | `DEEPSEEK_MODEL` | DeepSeek 模型名 | `deepseek-flash` |
-| `DEEPSEEK_THINKING` | `low` 或 `disabled` | `low` |
+| `DEEPSEEK_THINKING` | `low`、`medium`、`high`、`max` 或 `disabled` | `medium` |
 | `PORT` | 本地监听端口 | `3210` |
 
-服务端固定请求 DeepSeek 的 Chat Completions 接口，不允许表单指定任意服务地址。模型可用性和费用由实际服务端响应及服务商计费决定。
+默认使用 `deepseek-flash` + `medium`。截至 2026-10-28，[官方模型说明](https://api-docs.deepseek.com/)将该模型名对应到 **DeepSeek-V4.1-Flash-1017**；这是服务商可更新的别名，不是永久锁定的版本。客户端原样发送 `reasoning_effort: "medium"`，[官方映射](https://api-docs.deepseek.com/guides/thinking_mode/)将其实际思考强度解释为 `high`，不会由本项目降为 `low`。
+
+服务端固定请求 DeepSeek 的 Chat Completions 接口，不允许表单指定任意服务地址。正常流程仍为两次请求，每次业务输出上限保持 8,192 tokens；思考强度调整不会自动扩大预算。模型可用性和费用由实际服务端响应及服务商计费决定。
 
 ## 检查与真实 API 验收
 
