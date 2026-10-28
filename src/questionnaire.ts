@@ -46,6 +46,9 @@ export interface Questionnaire {
   };
   completionPolicy: {
     allApplicableBeforeAI: boolean;
+    questionnaireOptional: boolean;
+    missingAnswerStatus: "unknown";
+    missingApplicability: "unknown";
     allowUnknown: boolean;
     allowNotApplicable: boolean;
     skipOnlyWhenConditionFalse: boolean;
@@ -129,7 +132,7 @@ function validText(value: unknown, maxLength: number): value is string {
     && !/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/.test(value);
 }
 
-/** Validate a complete submission. It never supplies invented dates or answers. */
+/** Strict internal check for normalized answers; intake uses normalizeAnswers. */
 export function validateAnswers(answers: unknown, birth?: QuestionnaireBirthContext): AnswersValidation {
   const errors: ValidationIssue[] = [];
   const missingQuestionIds: string[] = [];
@@ -189,9 +192,9 @@ export function validateAnswers(answers: unknown, birth?: QuestionnaireBirthCont
     const hasResponse = Object.hasOwn(responses, question.id);
     const inactive = question.condition !== undefined && applicability[question.condition] === false;
     if (!hasResponse) {
-      if (!inactive && question.required) {
+      if (!inactive) {
         missingQuestionIds.push(question.id);
-        add(path, "required_answer", "请回答此题，或明确选择不知道 / 不适用。");
+        add(path, "required_answer", "此项尚未规范化为明确答案或 unknown。");
       }
       continue;
     }
@@ -253,17 +256,44 @@ export function validateAnswers(answers: unknown, birth?: QuestionnaireBirthCont
 export class QuestionnaireValidationError extends Error {
   readonly issues: ValidationIssue[];
   constructor(issues: ValidationIssue[]) {
-    super("问卷不完整或格式无效。");
+    super("已填写的问卷内容格式无效；未填写的项目可以留空。");
     this.name = "QuestionnaireValidationError";
     this.issues = structuredClone(issues);
   }
 }
 
-/** Organizes self-reports for comparison; it makes no independent hit claim. */
-export function buildEvidence(answers: unknown, birth?: QuestionnaireBirthContext): EvidenceBundle {
-  const validation = validateAnswers(answers, birth);
+/** Optional input becomes explicit unknowns; no substantive answer is inferred. */
+export function normalizeAnswers(answers?: unknown, birth?: QuestionnaireBirthContext): QuestionnaireAnswers {
+  const supplied = answers === undefined ? {} : answers;
+  if (!isRecord(supplied)) throw new QuestionnaireValidationError([{ path: "answers", code: "invalid_object", message: "问卷须为对象，或直接省略。" }]);
+  const normalized: Record<string, unknown> = { ...supplied };
+  const applicability = Object.hasOwn(supplied, "applicability") ? supplied.applicability : {};
+  const responses = Object.hasOwn(supplied, "responses") ? supplied.responses : {};
+  if (isRecord(applicability)) {
+    const defaults: Record<string, unknown> = { ...applicability };
+    for (const condition of bank.applicabilityQuestions) {
+      if (!Object.hasOwn(defaults, condition.id)) defaults[condition.id] = "unknown";
+    }
+    normalized.applicability = defaults;
+  } else normalized.applicability = applicability;
+  if (isRecord(responses)) {
+    const defaults: Record<string, unknown> = { ...responses };
+    for (const question of questions) {
+      if (!Object.hasOwn(defaults, question.id)) {
+        const inactive = question.condition !== undefined && isRecord(normalized.applicability) && normalized.applicability[question.condition] === false;
+        defaults[question.id] = { status: inactive ? "not_applicable" : "unknown" };
+      }
+    }
+    normalized.responses = defaults;
+  } else normalized.responses = responses;
+  const validation = validateAnswers(normalized, birth);
   if (!validation.valid) throw new QuestionnaireValidationError(validation.errors);
-  const validated = answers as QuestionnaireAnswers;
+  return structuredClone(normalized) as unknown as QuestionnaireAnswers;
+}
+
+/** Organizes self-reports for comparison; it makes no independent hit claim. */
+export function buildEvidence(answers?: unknown, birth?: QuestionnaireBirthContext): EvidenceBundle {
+  const validated = normalizeAnswers(answers, birth);
   const bundle: EvidenceBundle = { evidence: [], context: [] };
   for (const section of bank.sections) {
     for (const question of section.questions) {

@@ -55,7 +55,7 @@ export function createApp(options: AppOptions = {}) {
     try {
       checkOrigin(request);
       const url = new URL(request.url ?? '/', `http://${request.headers.host}`);
-      if (request.method === 'GET' && url.pathname === '/api/status') return send(response, 200, { app: 'Divination and Destiny Studies', version: '0.1.0', deepseek: status(), sessionTtlMinutes: runtime.session_ttl_ms / 60000, storage: 'memory_only' });
+      if (request.method === 'GET' && url.pathname === '/api/status') return send(response, 200, { app: 'Divination and Destiny Studies', version: '0.2.0', deepseek: status(), sessionTtlMinutes: runtime.session_ttl_ms / 60000, storage: 'memory_only', billing: 'server_operator_key', questionnaire: 'optional' });
       if (request.method === 'GET' && url.pathname === '/api/questionnaire') return send(response, 200, getQuestionnaire());
       if (request.method === 'POST' && url.pathname === '/api/session') return send(response, 201, workflow.create(await readBody(request)));
       if (request.method === 'DELETE' && url.pathname === '/api/session') {
@@ -84,7 +84,18 @@ export function createApp(options: AppOptions = {}) {
       }
       if (error instanceof AppError) {
         const details = 'details' in error ? error.details : undefined;
-        return send(response, error.status, { error: { code: error.code, message: error.message, ...(details ? { details } : {}) } });
+        const attempt = error.modelAttempt;
+        const modelAttempt = attempt ? {
+          stage: attempt.stage, model: attempt.model, durationMs: attempt.durationMs,
+          ...(attempt.providerModel ? { providerModel: attempt.providerModel } : {}),
+          usage: {
+            inputTokens: attempt.usage.inputTokens, outputTokens: attempt.usage.outputTokens,
+            totalTokens: attempt.usage.totalTokens,
+            ...(attempt.usage.cachedInputTokens !== undefined ? { cachedInputTokens: attempt.usage.cachedInputTokens } : {}),
+            ...(attempt.usage.reasoningTokens !== undefined ? { reasoningTokens: attempt.usage.reasoningTokens } : {}),
+          },
+        } : undefined;
+        return send(response, error.status, { error: { code: error.code, message: error.message, ...(details ? { details } : {}), ...(modelAttempt ? { modelAttempt } : {}) } });
       }
       if (error instanceof ChartInputError || error instanceof QuestionnaireValidationError) return send(response, 400, { error: { code: error.name, message: error.message } });
       send(response, 500, { error: { code: 'INTERNAL_ERROR', message: '本地处理失败，请检查资料或重启服务。' } });

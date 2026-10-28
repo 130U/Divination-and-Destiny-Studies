@@ -28,12 +28,12 @@ export function fakeModelData(request: DeepSeekRequest): ChartReview | PersonalA
   if (payload.task === 'compare_candidate_charts') {
     const ids = payload.candidates!.map(chart => chart.id);
     return {
-      status: 'recommended', recommended_candidate_id: ids[0]!,
-      ranking: ids.map(id => ({ candidate_id: id, supporting_evidence_ids: [knownIds[0]!], contradicting_evidence_ids: [], rationale: '受控假客户端只验证契约，不代表真实判断。', unresolved_questions: ['工程样例不提供命理有效性证据。'] })),
+      status: knownIds.length ? 'recommended' : 'provisional', recommended_candidate_id: ids[0]!,
+      ranking: ids.map(id => ({ candidate_id: id, supporting_evidence_ids: knownIds.slice(0, 1), contradicting_evidence_ids: [], rationale: '受控假客户端只验证契约，不代表真实判断。', unresolved_questions: ['工程样例不提供命理有效性证据。'] })),
       alternatives: ids.slice(1), summary: '受控测试结果；不是模型实测。', limits: ['没有验证预测正确率。'],
     };
   }
-  return { selected_candidate_id: payload.selected_chart!.id, overview: '受控测试分析。', sections: [{ domain: '职业', text: '已知经历来自用户测试输入。', evidence_ids: [knownIds[0]!], chart_basis: ['pillars.day'], uncertainties: ['无现实预测效力验证。'] }], scenarios: [], limitations: ['仅为工程测试。'] };
+  return { selected_candidate_id: payload.selected_chart!.id, overview: '受控测试分析。', sections: [{ domain: '职业', text: knownIds.length ? '已知经历来自用户测试输入。' : '合成命盘条件性分析，没有已知个人背景。', evidence_ids: knownIds.slice(0, 1), chart_basis: ['pillars.day'], uncertainties: ['无现实预测效力验证。'] }], scenarios: [], limitations: ['仅为工程测试。'] };
 }
 
 export function fakeResponse(data: unknown): DeepSeekResult {

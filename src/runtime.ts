@@ -1,4 +1,13 @@
 import { readFileSync } from 'node:fs';
+import type { DeepSeekUsage } from './deepseek.ts';
+
+export interface ModelAttempt {
+  stage: 'review' | 'analysis';
+  usage: DeepSeekUsage;
+  model: string;
+  providerModel?: string;
+  durationMs: number;
+}
 
 export const runtime = Object.freeze(JSON.parse(readFileSync(new URL('../configs/runtime.v1.json', import.meta.url), 'utf8')) as {
   version: string; session_ttl_ms: number; max_sessions: number; max_request_bytes: number;
@@ -9,6 +18,7 @@ export const runtime = Object.freeze(JSON.parse(readFileSync(new URL('../configs
 export class AppError extends Error {
   readonly code: string;
   readonly status: number;
+  modelAttempt?: ModelAttempt;
   constructor(code: string, message: string, status = 400) {
     super(message); this.name = 'AppError'; this.code = code; this.status = status;
   }

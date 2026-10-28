@@ -25,7 +25,13 @@ if (!getDeepSeekStatus().configured) {
     return result;
   } } });
   try {
-    const session = workflow.create(syntheticSubmission());
+    const submission = syntheticSubmission();
+    const { startTime: _start, endTime: _end, ...exactBirth } = submission.birth;
+    const birth = process.argv.includes('--single-candidate')
+      ? { ...exactBirth, timeMode: 'exact', time: '09:30' }
+      : submission.birth;
+    const birthOnly = process.argv.includes('--birth-only');
+    const session = workflow.create(birthOnly ? { birth } : { ...submission, birth });
     const review = await workflow.review(session.id);
     assert.equal(review.cached, false);
     completedStages.push('review');
@@ -39,7 +45,9 @@ if (!getDeepSeekStatus().configured) {
     console.log(JSON.stringify({
       kind: 'synthetic_live_integration_check', status: 'passed', predictiveAccuracyEvaluated: false,
       candidateCount: session.candidateSet.candidates.length, reviewStatus: review.review.status,
-      workingChartSelection: review.review.recommended_candidate_id ? 'model_recommendation' : 'explicit_synthetic_test_selection',
+      workingChartSelection: review.review.selection_source, birthOnly,
+      evidenceMode: analysis.analysis.evidence_mode, sectionCount: analysis.analysis.sections.length,
+      reportWarnings: [...(review.review.reportWarnings ?? []), ...(analysis.analysis.reportWarnings ?? [])],
       thinking, attemptedRequests, completedStages, responses,
       cachedRepeatsAvoidedModelCalls: cached.cached && cachedAnalysis.cached,
     }, null, 2));

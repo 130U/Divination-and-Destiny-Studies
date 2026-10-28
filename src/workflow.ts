@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { generateCandidateCharts, type BirthInput, type CandidateSet } from './chartEngine.ts';
-import { buildEvidence, getQuestionnaire, validateAnswers, type EvidenceItem, type QuestionnaireAnswers } from './questionnaire.ts';
+import { buildEvidence, getQuestionnaire, normalizeAnswers, QuestionnaireValidationError, type EvidenceItem } from './questionnaire.ts';
 import { createDeepSeekClient, type DeepSeekResult } from './deepseek.ts';
 import { ANALYSIS_SYSTEM, REVIEW_SYSTEM, analysisPayload, reviewPayload, chartReferencePaths, referenceableEvidenceIds } from './prompts.ts';
 import { validateAnalysis, validateReview, type ChartReview, type PersonalAnalysis } from './results.ts';
@@ -26,6 +26,19 @@ export interface WorkflowOptions {
   now?: () => number;
 }
 
+function validateModelResult<T>(stage: 'review' | 'analysis', meta: Omit<DeepSeekResult, 'data'>, validate: () => T): T {
+  try { return validate(); }
+  catch (error) {
+    if (error instanceof AppError) {
+      Object.assign(error, { modelAttempt: {
+        stage, usage: structuredClone(meta.usage), model: meta.model,
+        ...(meta.providerModel ? { providerModel: meta.providerModel } : {}), durationMs: meta.durationMs,
+      } });
+    }
+    throw error;
+  }
+}
+
 export class Workflow {
   private sessions = new Map<string, Session>();
   private client: ReturnType<typeof createDeepSeekClient>;
@@ -45,7 +58,7 @@ export class Workflow {
 
   private get(id: unknown): Session {
     this.prune();
-    if (typeof id !== 'string' || !/^[a-f0-9-]{36}$/.test(id)) throw new AppError('INVALID_SESSION', '请先提交完整问卷。');
+    if (typeof id !== 'string' || !/^[a-f0-9-]{36}$/.test(id)) throw new AppError('INVALID_SESSION', '请先提交出生资料生成候选盘。');
     const session = this.sessions.get(id);
     if (!session) throw new AppError('SESSION_EXPIRED', '会话已清除或过期，请重新提交资料。', 410);
     return session;
@@ -78,12 +91,14 @@ export class Workflow {
       throw new AppError('BIRTH_DATE_RANGE', '问卷产品支持 1900 年至今天的公历出生日期；农历输入会先转换。');
     }
     const questionContext = { birthDate: solarBirthDate, asOfDate };
-    const validation = validateAnswers(request.answers, questionContext);
-    if (!validation.valid) {
-      const error = new AppError('INCOMPLETE_QUESTIONNAIRE', '请先完成所有适用问题；不知道的项目可以明确选择“不知道”。');
-      Object.assign(error, { details: validation.errors }); throw error;
+    let answers;
+    try { answers = normalizeAnswers(request.answers, questionContext); }
+    catch (cause) {
+      if (!(cause instanceof QuestionnaireValidationError)) throw cause;
+      const error = new AppError('INVALID_QUESTIONNAIRE', '已填写的问卷内容有无效值，请核对标记字段；其余项目可留空。');
+      Object.assign(error, { details: cause.issues }); throw error;
     }
-    const { evidence, context } = freeze(buildEvidence(request.answers as QuestionnaireAnswers, questionContext));
+    const { evidence, context } = freeze(buildEvidence(answers, questionContext));
     const now = this.now(), expires = now + runtime.session_ttl_ms;
     const session: Session = {
       id: randomUUID(), createdAt: new Date(now).toISOString(), expiresAt: new Date(expires).toISOString(), expires, asOfDate,
@@ -102,12 +117,11 @@ export class Workflow {
     }
     if (session.reviewPending) throw new AppError('REVIEW_IN_PROGRESS', '这份资料正在校盘，请等待结果。', 409);
     const knownIds = referenceableEvidenceIds(session.evidence);
-    if (!knownIds.length) throw new AppError('INSUFFICIENT_EVIDENCE', '校盘问题尚无可用事实，暂不发起付费模型请求。可保留候选盘或补充已知经历。');
     const payload = reviewPayload(session.candidateSet, session.evidence, session.asOfDate);
     this.enterModel(); session.reviewPending = true;
     try {
       const { data, ...meta } = await this.client.completeJson({ system: REVIEW_SYSTEM, payload, maxOutputTokens: runtime.review_max_output_tokens });
-      const result = validateReview(data, session.candidateSet.candidates.map(chart => chart.id), knownIds);
+      const result = validateModelResult('review', meta, () => validateReview(data, session.candidateSet.candidates.map(chart => chart.id), knownIds));
       this.stillActive(session);
       session.review = freeze({ result, ...meta });
       return structuredClone({ review: result, ...meta, cached: false });
@@ -125,13 +139,13 @@ export class Workflow {
     const cached = session.analyses.get(selectedId);
     if (cached) { const { result: analysis, ...meta } = cached; return structuredClone({ analysis, ...meta, cached: true }); }
     if (session.analysisPending) throw new AppError('ANALYSIS_IN_PROGRESS', '这份资料正在分析，请等待结果。', 409);
-    const selectedBy = selectedId === review.recommended_candidate_id ? 'model' : 'user';
+    const selectedBy = selectedId === review.recommended_candidate_id ? review.selection_source ?? 'model' : 'user';
     const payload = analysisPayload(session.candidateSet, chart, review, session.evidence, session.context, selectedBy, session.asOfDate);
     const knownIds = referenceableEvidenceIds([...session.evidence, ...session.context]);
     this.enterModel(); session.analysisPending = true;
     try {
       const { data, ...meta } = await this.client.completeJson({ system: ANALYSIS_SYSTEM, payload, maxOutputTokens: runtime.analysis_max_output_tokens });
-      const result = validateAnalysis(data, selectedId, knownIds, chartReferencePaths(chart));
+      const result = validateModelResult('analysis', meta, () => validateAnalysis(data, selectedId, knownIds, chartReferencePaths(chart)));
       this.stillActive(session);
       session.analyses.set(selectedId, freeze({ result, ...meta }));
       return structuredClone({ analysis: result, ...meta, cached: false });

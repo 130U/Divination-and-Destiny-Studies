@@ -27,6 +27,16 @@ function announce(message) { $('status-message').textContent = message; $('statu
 function showError(message) { $('error-message').textContent = message; $('error-message').hidden = false; $('error-message').focus(); }
 function clearError() { $('error-message').hidden = true; $('error-message').textContent = ''; }
 function errorText(error) { return error instanceof Error ? error.message : '请求未完成，请稍后明确重试。'; }
+function stageStatus(stage, kind, message) {
+  const target = $(`${stage}-call-status`);
+  target.dataset.state = kind; target.setAttribute('role', kind === 'error' ? 'alert' : 'status');
+  target.setAttribute('aria-live', kind === 'error' ? 'assertive' : 'polite');
+  target.textContent = message; target.hidden = !message;
+}
+function reportWarnings(root, result) {
+  const warnings = [...new Set([...(result.reportWarnings || []), ...(result.review?.reportWarnings || []), ...(result.analysis?.reportWarnings || [])])];
+  if (warnings.length) { const note = element('aside', null, 'report-notes'); note.append(element('p', '阅读提示', 'evidence-title'), bulletList(warnings)); root.append(note); }
+}
 
 async function api(path, method = 'GET', body) {
   let response;
@@ -39,7 +49,9 @@ async function api(path, method = 'GET', body) {
   if (!response.ok) {
     const message = data?.error?.message || '请求未完成。';
     const details = Array.isArray(data?.error?.details) ? data.error.details.map((item) => item?.message).filter(Boolean).slice(0, 8) : [];
-    throw new Error([message, ...details].join('\n'));
+    const failure = new Error([message, ...details].join('\n'));
+    if (data?.error?.modelAttempt && typeof data.error.modelAttempt === 'object') failure.modelAttempt = data.error.modelAttempt;
+    throw failure;
   }
   return data;
 }
@@ -56,7 +68,7 @@ async function refreshStatus() {
     $('provider-status').textContent = '无法读取服务状态'; $('provider-status').classList.add('warning');
   } finally {
     $('refresh-status').disabled = false;
-    if (state.session && !state.review && !state.busy) $('review-call-status').textContent = state.configured ? '服务端模型已配置，点击按钮后才会发送资料并调用 AI。' : 'DeepSeek 尚未配置。你可以查看本地候选盘；服务端配置完成后点击页首“刷新”。';
+    if (state.session && !state.review && !state.busy) stageStatus('review', 'info', state.configured ? '服务端模型已配置，点击按钮后才会发送资料并调用 AI。' : 'DeepSeek 尚未配置。你可以查看本地候选盘；服务端配置完成后点击页首“刷新”。');
     updateActions();
   }
 }
@@ -68,7 +80,7 @@ function updateActions() {
   $('submit-intake').disabled = Boolean(state.busy) || !state.questionnaire;
   $('submit-intake').firstChild.textContent = state.busy === 'session' ? '正在生成候选盘… ' : state.session ? '重新提交并生成候选盘 ' : '生成候选盘 ';
   $('review-button').disabled = Boolean(state.busy) || !state.session || !state.configured || Boolean(state.review);
-  $('review-button').textContent = state.busy === 'review' ? '正在校盘，请稍候…' : state.review ? 'AI 校盘已完成' : '一次 AI 校盘';
+  $('review-button').textContent = state.busy === 'review' ? '正在校盘，请稍候…' : state.review ? 'AI 校盘已完成' : '开始 AI 校盘';
   $('analysis-button').disabled = Boolean(state.busy) || !state.review || !state.selection || !state.configured || Boolean(state.analysis);
   $('analysis-button').textContent = state.busy === 'analysis' ? '正在分析，请稍候…' : state.analysis ? '深入分析已完成' : '生成深入分析';
   $('selected-candidate').disabled = Boolean(state.busy) || Boolean(state.analysis);
@@ -80,7 +92,7 @@ function clearResults() {
   state.session = null; state.submitted = null; state.review = null; state.analysis = null; state.selection = '';
   for (const id of ['candidate-section', 'analysis-section', 'report-section']) $(id).hidden = true;
   for (const id of ['candidate-list', 'candidate-warnings', 'review-result', 'analysis-result']) $(id).replaceChildren();
-  $('review-call-status').textContent = ''; $('analysis-call-status').textContent = '';
+  stageStatus('review', 'info', ''); stageStatus('analysis', 'info', '');
   $('selected-candidate').replaceChildren(option('', '请选择工作盘')); updateActions();
 }
 async function deleteSession(id) {
@@ -143,24 +155,26 @@ function addEvent(control) {
 function renderQuestionnaire(bank) {
   state.questionnaire = bank; state.questionControls.clear(); state.applicability.clear();
   const root = $('questionnaire-content'); root.replaceChildren();
+  const applicabilityGroup = element('details', null, 'question-group applicability-group');
+  const applicabilityHeading = element('summary', null, 'group-heading'); applicabilityHeading.append(element('h3', '适用情况'), element('span', '可选 · 留空按未知')); applicabilityGroup.append(applicabilityHeading);
   const applicability = element('div', null, 'applicability-grid');
   for (const q of bank.applicabilityQuestions) {
-    const control = select(`applicability-${q.id}`, q.options); control.required = true;
+    const control = select(`applicability-${q.id}`, q.options, '留空 / 按未知处理'); control.required = false;
     applicability.append(field(q.label, control)); state.applicability.set(q.id, control);
   }
-  root.append(applicability);
+  applicabilityGroup.append(applicability); root.append(applicabilityGroup);
   let number = 0;
   for (const section of bank.sections) {
     const stages = [...new Set(section.questions.map((q) => q.stage))];
     for (const stage of stages) {
-      const questions = section.questions.filter((q) => q.stage === stage), group = element('div', null, 'question-group');
-      const heading = element('div', null, 'group-heading'); heading.append(element('h3', questions[0].stageLabel), element('span', `${questions.length} 题`)); group.append(heading);
+      const questions = section.questions.filter((q) => q.stage === stage), group = element('details', null, 'question-group');
+      const heading = element('summary', null, 'group-heading'); heading.append(element('h3', questions[0].stageLabel), element('span', `${questions.length} 项可选`)); group.append(heading);
       for (const q of questions) {
         number++;
         const card = element('div', null, 'question-card'); card.id = `question-${q.id}`;
         const title = element('label', null, 'question-title'); title.htmlFor = `status-${q.id}`;
         title.append(element('span', String(number).padStart(2, '0'), 'question-number'), document.createTextNode(q.label));
-        const status = select(`status-${q.id}`, bank.answerStatuses, '请选择回复方式'); status.className = 'answer-status'; status.required = true;
+        const status = select(`status-${q.id}`, bank.answerStatuses, '留空 / 按未知处理'); status.className = 'answer-status'; status.required = false;
         const content = element('div', null, 'answer-content'); content.hidden = true;
         const control = { question: q, card, status, content };
         if (q.type === 'single_choice') {
@@ -190,7 +204,7 @@ function readQuestionValue(control) {
   const q = control.question;
   if (q.type === 'single_choice' || q.type === 'short_text') return control.valueInput.value.trim();
   if (q.type === 'multi_choice') return [...control.content.querySelectorAll('input:checked')].map((item) => item.value);
-  const events = [...control.eventList.children].map((row) => {
+  const events = [...control.eventList.children].filter(eventRowHasContent).map((row) => {
     const value = {};
     for (const item of row.querySelectorAll('[data-event-field]')) {
       const key = item.dataset.eventField;
@@ -201,53 +215,64 @@ function readQuestionValue(control) {
   });
   return q.type === 'year_event' ? events[0] : events;
 }
+function eventRowHasContent(row) { return [...row.querySelectorAll('[data-event-field]')].some((item) => item.value.trim() !== ''); }
+function hasAnswerValue(control) {
+  if (control.status.value !== 'answered') return false;
+  const value = readQuestionValue(control);
+  return Array.isArray(value) ? value.length > 0 : typeof value === 'string' ? value.trim().length > 0 : Boolean(value);
+}
 function isApplicable(q) { return !q.condition || state.applicability.get(q.condition)?.value !== 'false'; }
 function refreshQuestions() {
   if (!state.questionnaire) return;
   let complete = 0, total = 0;
   for (const [id, control] of state.questionControls) {
     const q = control.question, applicable = isApplicable(q), answered = control.status.value === 'answered';
-    control.card.hidden = !applicable; control.status.disabled = !applicable; control.status.required = applicable;
+    control.card.hidden = !applicable; control.status.disabled = !applicable; control.status.required = false;
     control.status.setCustomValidity(''); control.content.hidden = !applicable || !answered;
-    for (const item of control.content.querySelectorAll('input,select,textarea')) { item.disabled = !applicable || !answered; item.required = applicable && answered && item.dataset.needsValue === 'true'; item.setCustomValidity(''); }
+    for (const item of control.content.querySelectorAll('input,select,textarea')) { item.disabled = !applicable || !answered; item.required = false; item.setCustomValidity(''); }
     if (control.addButton) control.addButton.disabled = control.eventList.children.length >= (q.maxItems || 1);
     if (!applicable) continue;
     total++;
-    let valid = Boolean(control.status.value);
+    let valid = Boolean(control.status.value) && (control.status.value !== 'answered' || hasAnswerValue(control));
     if (answered) {
       const value = readQuestionValue(control);
-      if (q.type === 'multi_choice' && (!value.length || value.length > q.maxSelections)) control.status.setCustomValidity(`请选择 1 至 ${q.maxSelections} 项，或明确选择不知道 / 不适用。`);
+      if (q.type === 'multi_choice' && value.length > q.maxSelections) control.status.setCustomValidity(`最多可选择 ${q.maxSelections} 项，请调整已填写的答案。`);
       if (q.type === 'multi_choice' && value.length > 1 && value.some((item) => q.unknownOptionIds?.includes(item))) control.status.setCustomValidity('不确定选项不能与其他答案同时选择，请核对。');
-      if (q.type === 'short_text' && !value) control.valueInput.setCustomValidity('请填写答案，或明确选择不知道 / 不适用。');
       if (control.eventList) {
-        if (!control.eventList.children.length) control.status.setCustomValidity('请添加至少一条经历，或明确选择不知道 / 不适用。');
         for (const row of control.eventList.children) {
+          const hasContent = eventRowHasContent(row);
+          for (const item of row.querySelectorAll('[data-event-field]')) item.required = hasContent && item.dataset.needsValue === 'true';
           const date = row.querySelector('[data-event-field=date]'), year = row.querySelector('[data-event-field=year]');
           if (date.value && year.value && date.value.slice(0, 4) !== year.value) date.setCustomValidity('确切日期与发生年份需要一致。');
+          const description = row.querySelector('[data-event-field=description]');
+          if (hasContent && !description.value.trim()) description.setCustomValidity('这条经历尚未填完整，请补充描述，或移除此条记录。');
         }
       }
-      valid = control.status.validity.valid && [...control.content.querySelectorAll('input,select,textarea')].every((item) => item.validity.valid);
-      if (q.type === 'short_text' && !value) valid = false;
+      valid = hasAnswerValue(control) && control.status.validity.valid && [...control.content.querySelectorAll('input,select,textarea')].every((item) => item.validity.valid);
     }
     if (valid) complete++;
     control.card.dataset.complete = String(valid);
   }
   for (const q of state.questionnaire.applicabilityQuestions) {
     const control = state.applicability.get(q.id); control.setCustomValidity('');
+    if (control.value === 'false') {
+      const supplied = [...state.questionControls.values()].find((item) => item.question.condition === q.id && hasAnswerValue(item));
+      if (supplied) control.setCustomValidity('已填写这一类经历。请改为适用，或明确清除对应记录后再选不适用。');
+    }
     if (control.value === 'false' && q.impliedTrueBy) {
       const related = state.questionControls.get(q.impliedTrueBy.questionId);
       if (related?.status.value === 'answered' && q.impliedTrueBy.optionIds.includes(readQuestionValue(related))) control.setCustomValidity('适用情况与当前身份的答案不一致，请核对。');
     }
   }
-  $('question-progress').textContent = `${complete} / ${total} 题已完成`;
-  $('completion-summary').textContent = complete === total ? '问卷已完成，请核对出生资料' : `问卷还需回复 ${total - complete} 题`;
+  $('question-progress').textContent = `${total} 项可选 · 已回应 ${complete} 项`;
+  $('completion-summary').textContent = complete ? `已回应 ${complete} 项背景，可以继续` : '只填出生资料，也可以继续';
 }
 function answersData() {
   const responses = {}, applicability = {};
   for (const [id, control] of state.applicability) applicability[id] = control.value === 'true' ? true : control.value === 'false' ? false : 'unknown';
   for (const [id, control] of state.questionControls) {
     if (!isApplicable(control.question)) continue;
-    responses[id] = control.status.value === 'answered' ? { status: 'answered', value: readQuestionValue(control) } : { status: control.status.value };
+    responses[id] = hasAnswerValue(control) ? { status: 'answered', value: readQuestionValue(control) } : { status: control.status.value === 'not_applicable' ? 'not_applicable' : 'unknown' };
   }
   return { responses, applicability };
 }
@@ -284,15 +309,20 @@ function evidenceText(id) {
 }
 function references(root, title, ids, contradiction = false) {
   root.append(element('p', title, contradiction ? 'evidence-title contradiction' : 'evidence-title'));
-  root.append(ids?.length ? bulletList(ids.map(evidenceText)) : element('p', '未列出依据。', 'muted'));
+  root.append(ids?.length ? bulletList(ids.map(evidenceText)) : element('p', contradiction ? '本轮未列出矛盾线索。' : '未提供相关个人背景，本段不构成对已知经历的验证。', 'muted'));
 }
 function usageText(result) {
   const usage = result.usage || {}, number = (value) => typeof value === 'number' ? value.toLocaleString('zh-CN') : '未返回';
   const prefix = result.cached ? '复用已保存结果，本次未新增模型调用。以下为原调用用量。\n' : '已完成真实模型调用。\n';
-  return `${prefix}${result.model || '模型未返回'} · 输入 ${number(usage.inputTokens)} / 输出 ${number(usage.outputTokens)} / 合计 ${number(usage.totalTokens)} token` +
+  return `${prefix}${result.model || '模型未返回'}${result.providerModel && result.providerModel !== result.model ? `（实际模型 ${result.providerModel}）` : ''} · 输入 ${number(usage.inputTokens)} / 输出 ${number(usage.outputTokens)} / 合计 ${number(usage.totalTokens)} token` +
     (typeof usage.cachedInputTokens === 'number' ? ` · 缓存输入 ${number(usage.cachedInputTokens)}` : '') +
     (typeof usage.reasoningTokens === 'number' ? ` · 思考 ${number(usage.reasoningTokens)}` : '') +
-    (typeof result.durationMs === 'number' ? ` · ${(result.durationMs / 1000).toFixed(1)} 秒` : '');
+    (typeof result.durationMs === 'number' ? ` · ${(result.durationMs / 1000).toFixed(1)} 秒` : '') +
+    '\n以上仅为这一次模型调用的用量，不含其他阶段或此前失败、重试。';
+}
+function failedStageText(error) {
+  if (error?.modelAttempt) return `模型已返回，但这次结果未通过格式校验。资料仍然保留，重试会产生新的调用。\n${errorText(error)}\n${usageText(error.modelAttempt)}`;
+  return `${errorText(error)}\n资料和已有结果仍然保留。系统不会自动重试；你可以明确点击按钮再试一次，失败请求可能已产生模型用量。`;
 }
 
 function renderCandidates() {
@@ -309,32 +339,39 @@ function renderCandidates() {
     const details = element('details'); details.append(element('summary', '查看本地排盘依据'), element('pre', JSON.stringify({ features: item.features, warnings: item.warnings }, null, 2)));
     card.append(topline, pillars, element('p', timeLabel.replaceAll('T', ' '), 'candidate-time'), details); list.append(card);
   }
-  if (!state.configured) $('review-call-status').textContent = 'DeepSeek 尚未配置。你可以查看本地候选盘；服务端配置完成后点击页首“刷新”。';
+  if (!state.configured) stageStatus('review', 'info', 'DeepSeek 尚未配置。你可以查看本地候选盘；服务端配置完成后点击页首“刷新”。');
 }
 function renderReview(result) {
   const review = result.review, root = $('review-result'); root.replaceChildren();
-  const statusLabels = { recommended: '暂定推荐', ambiguous: '多个候选仍难区分', insufficient_evidence: '证据不足' };
-  const intro = element('div', null, 'result-intro'); intro.append(element('p', statusLabels[review.status] || review.status, 'result-label'), element('div', review.summary)); root.append(intro);
+  const statusLabels = { recommended: '暂定推荐', provisional: '暂用工作盘', ambiguous: '保留多个候选，先使用暂定盘', insufficient_evidence: '背景较少，先使用暂定盘' };
+  const selectionSource = review.selection_source || result.selection_source;
+  const intro = element('div', null, 'result-intro'); intro.append(element('p', selectionSource === 'birth_input' ? '出生资料对应的暂用盘' : statusLabels[review.status] || review.status, 'result-label'), element('div', review.summary)); root.append(intro);
+  if ((review.evidence_mode || result.evidence_mode) === 'chart_only') root.append(element('p', '本轮主要依据命盘展开；补充经历后可进一步比较候选，但现在也可以继续分析。', 'context-note'));
+  reportWarnings(root, result);
   for (const [index, row] of review.ranking.entries()) {
     const card = element('article', null, 'assessment'), heading = element('div', null, 'assessment-title');
     heading.append(element('h3', `${index + 1}. ${candidateLabel(row.candidate_id)}`));
-    if (row.candidate_id === review.recommended_candidate_id) heading.append(element('span', '暂定推荐', 'count-pill'));
+    if (row.candidate_id === review.recommended_candidate_id) heading.append(element('span', review.status === 'recommended' && selectionSource !== 'birth_input' ? '暂定推荐' : '暂用工作盘', 'count-pill'));
     else if (review.alternatives.includes(row.candidate_id)) heading.append(element('span', '保留备选', 'count-pill'));
     card.append(heading, element('p', row.rationale)); references(card, '支持线索 · 用户提供', row.supporting_evidence_ids); references(card, '矛盾线索 · 用户提供', row.contradicting_evidence_ids, true);
     if (row.unresolved_questions.length) card.append(element('p', '仍待澄清', 'evidence-title'), bulletList(row.unresolved_questions)); root.append(card);
   }
   root.append(element('p', '本轮局限', 'evidence-title'), bulletList(review.limits));
-  $('review-call-status').textContent = usageText(result);
+  stageStatus('review', 'success', usageText(result));
   const selection = $('selected-candidate'); selection.replaceChildren(option('', '请明确选择一个暂定工作盘'));
   for (const item of state.session.candidateSet.candidates) selection.append(option(item.id, candidateLabel(item.id)));
-  state.selection = review.recommended_candidate_id || ''; selection.value = state.selection;
-  $('selection-note').textContent = state.selection ? '已采用暂定推荐；深入分析前，你仍可选择其他候选。' : '模型未推荐单一时辰。若继续，请自行选择一个暂定工作盘，并保留这种不确定性。';
+  const suggested = candidate(review.recommended_candidate_id)?.id;
+  const firstRanked = review.ranking.find((row) => candidate(row.candidate_id))?.candidate_id;
+  state.selection = suggested || firstRanked || state.session.candidateSet.candidates[0]?.id || ''; selection.value = state.selection;
+  $('selection-note').textContent = selectionSource === 'birth_input' ? '出生资料对应这一候选，因此用它展开分析。这不是 AI 对真实出生时辰的独立确认。' : suggested && review.status === 'recommended' ? '已采用暂定推荐。深入分析前，你可以切换到其他候选。' : '先按当前排序选择暂用盘展开分析，不代表出生时辰已确认。你可以在此切换候选。';
   $('analysis-section').hidden = false; $('report-section').hidden = false; highlightSelection(); updateActions();
 }
 function highlightSelection() { for (const card of $('candidate-list').children) card.classList.toggle('selected', card.dataset.candidateId === state.selection); }
 function renderAnalysis(result) {
   const analysis = result.analysis, root = $('analysis-result'); root.replaceChildren();
   root.append(element('div', analysis.overview, 'result-intro'));
+  if ((analysis.evidence_mode || result.evidence_mode) === 'chart_only') root.append(element('p', '以下主要是命盘层面的模型解释，未结合尚未提供的个人背景。', 'context-note'));
+  reportWarnings(root, result);
   for (const section of analysis.sections) {
     const card = element('article', null, 'analysis-part'); card.append(element('h3', section.domain), element('p', section.text));
     references(card, '引用的已知资料 · 用户提供', section.evidence_ids);
@@ -347,7 +384,7 @@ function renderAnalysis(result) {
     root.append(section);
   }
   root.append(element('p', '分析边界', 'evidence-title'), bulletList(analysis.limitations));
-  $('analysis-call-status').textContent = usageText(result);
+  stageStatus('analysis', 'success', usageText(result));
   $('selection-note').textContent = '本次分析的工作盘已固定。如需更换，请修改资料或重新提交，建立新会话。'; updateActions();
 }
 
@@ -356,31 +393,33 @@ $('intake-form').addEventListener('change', () => { invalidateSession(); updateB
 $('intake-form').addEventListener('submit', async (event) => {
   event.preventDefault(); if (state.busy || !state.questionnaire) return;
   clearError(); updateBirthFields(); refreshQuestions();
-  if (!$('intake-form').reportValidity()) { announce('请补全标记的资料，或为对应问卷明确选择不知道 / 不适用。'); return; }
+  const invalid = [...$('intake-form').querySelectorAll('input,select,textarea')].filter((control) => !control.disabled && !control.validity.valid);
+  for (const control of invalid) { let group = control.closest('details'); while (group) { group.open = true; group = group.parentElement.closest('details'); } }
+  if (!$('intake-form').reportValidity()) { announce('请核对必需的出生资料；已经填写一部分的经历，需要补全或移除。其余背景可以全部留空。'); return; }
   const submitted = { birth: birthData(), answers: answersData() }, previous = state.session?.id;
   clearResults(); setBusy('session'); announce('正在本地计算候选盘，不会调用 AI。');
   try {
     if (previous && !await deleteSession(previous)) throw new Error('旧会话删除未确认，请稍后再提交。');
     const session = await api('/api/session', 'POST', submitted); state.session = session; state.submitted = submitted;
     renderCandidates(); announce(`候选盘已生成。资料临时保存在服务内存中${session.expiresAt ? `，有效至 ${new Date(session.expiresAt).toLocaleString('zh-CN')}` : ''}。AI 尚未调用。`);
-    $('candidate-section').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    $('candidate-section').scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' });
   } catch (error) { showError(errorText(error)); announce('候选盘尚未生成，请核对资料后重试。'); }
   finally { setBusy(null); }
 });
 
 $('review-button').addEventListener('click', async () => {
   if (state.busy || !state.session || state.review || !state.configured) return;
-  clearError(); setBusy('review'); $('review-call-status').textContent = '正在调用 DeepSeek 比较候选盘，通常需要一些时间。请勿重复提交。';
-  try { const result = await api('/api/review', 'POST', { sessionId: state.session.id }); state.review = result; renderReview(result); announce('AI 校盘已完成。请阅读矛盾与局限，再确认深入分析的工作盘。'); }
-  catch (error) { showError(errorText(error)); $('review-call-status').textContent = '校盘未完成，未使用 mock 替代。你可以明确点击按钮重试；失败请求可能已产生模型用量。'; }
+  clearError(); announce(''); setBusy('review'); stageStatus('review', 'pending', '正在请求 DeepSeek 比较候选盘。资料已保留，请稍候，无需重复提交。');
+  try { const result = await api('/api/review', 'POST', { sessionId: state.session.id }); state.review = result; renderReview(result); }
+  catch (error) { stageStatus('review', 'error', failedStageText(error)); }
   finally { setBusy(null); }
 });
 $('selected-candidate').addEventListener('change', () => { if (state.analysis || state.busy) return; state.selection = $('selected-candidate').value; highlightSelection(); updateActions(); });
 $('analysis-button').addEventListener('click', async () => {
   if (state.busy || !state.session || !state.review || !state.selection || state.analysis || !state.configured) return;
-  clearError(); setBusy('analysis'); $('analysis-call-status').textContent = '正在调用 DeepSeek，将工作盘与现实背景结合。请勿重复提交。';
-  try { const result = await api('/api/analysis', 'POST', { sessionId: state.session.id, candidateId: state.selection }); state.analysis = result; renderAnalysis(result); announce('深入分析已完成，可以下载本次记录。'); }
-  catch (error) { showError(errorText(error)); $('analysis-call-status').textContent = '分析未完成，未使用 mock 替代。你可以明确点击按钮重试；失败请求可能已产生模型用量。'; }
+  clearError(); announce(''); setBusy('analysis'); stageStatus('analysis', 'pending', '正在请求 DeepSeek 分析工作盘与已提供的背景。资料已保留，请稍候。');
+  try { const result = await api('/api/analysis', 'POST', { sessionId: state.session.id, candidateId: state.selection }); state.analysis = result; renderAnalysis(result); }
+  catch (error) { stageStatus('analysis', 'error', failedStageText(error)); }
   finally { setBusy(null); }
 });
 $('clear-session').addEventListener('click', async () => {
@@ -391,6 +430,17 @@ $('clear-session').addEventListener('click', async () => {
 });
 $('refresh-status').addEventListener('click', refreshStatus);
 
+const menuButton = $('menu-toggle');
+function closeMenu() { menuButton.setAttribute('aria-expanded', 'false'); $('work-navigation').classList.remove('is-open'); }
+menuButton.addEventListener('click', () => { const open = menuButton.getAttribute('aria-expanded') !== 'true'; menuButton.setAttribute('aria-expanded', String(open)); $('work-navigation').classList.toggle('is-open', open); });
+function activeSection(id) { for (const link of document.querySelectorAll('.side-nav nav a')) { if (link.hash === `#${id}`) link.setAttribute('aria-current', 'step'); else link.removeAttribute('aria-current'); } }
+for (const link of document.querySelectorAll('.side-nav nav a')) link.addEventListener('click', () => { activeSection(link.hash.slice(1)); closeMenu(); });
+document.addEventListener('keydown', (event) => { if (event.key === 'Escape' && menuButton.getAttribute('aria-expanded') === 'true') { closeMenu(); menuButton.focus(); } });
+if ('IntersectionObserver' in window) {
+  const observer = new IntersectionObserver((entries) => { for (const entry of entries) if (entry.isIntersecting) activeSection(entry.target.id); }, { rootMargin: '-12% 0px -65% 0px' });
+  for (const id of ['birth-section', 'questionnaire-section', 'candidate-section', 'analysis-section']) observer.observe($(id));
+}
+
 function reportData() { return { reportVersion: '1.0', exportedAt: new Date().toISOString(), asOfDate: state.session.asOfDate, birth: state.submitted.birth, answers: state.submitted.answers, candidateSet: state.session.candidateSet, evidence: state.session.evidence, context: state.session.context, selectedCandidateId: state.selection || null, review: state.review, analysis: state.analysis, notice: '用户提供的经历未经独立验证。AI 推荐不代表真实出生时辰得到证明。' }; }
 function markdownReport(report) {
   const escape = (value) => String(value).replace(/[\\`*_\[\]<>!]/g, '\\$&');
@@ -399,10 +449,14 @@ function markdownReport(report) {
   lines.push('', '## 本地候选盘', '');
   for (const item of report.candidateSet.candidates) lines.push(`- ${escape(candidateLabel(item.id))}；${escape(item.id)}`);
   lines.push('', '## AI 校盘', '', `结论状态：${escape(report.review.review.status)}`, `暂定推荐：${report.review.review.recommended_candidate_id ? escape(candidateLabel(report.review.review.recommended_candidate_id)) : '未推荐单一时辰'}`, `保留备选：${report.review.review.alternatives.map((id) => escape(candidateLabel(id))).join('；') || '未列出'}`, '', escape(report.review.review.summary), '', ...report.review.review.ranking.flatMap((item) => [`### ${escape(candidateLabel(item.candidate_id))}`, '', escape(item.rationale), '', '**支持线索**', ...item.supporting_evidence_ids.map((id) => `- ${escape(evidenceText(id))}`), '', '**矛盾线索**', ...item.contradicting_evidence_ids.map((id) => `- ${escape(evidenceText(id))}`), '', '**仍待澄清**', ...item.unresolved_questions.map((text) => `- ${escape(text)}`), '']), '**局限**', ...report.review.review.limits.map((text) => `- ${escape(text)}`), '', escape(usageText(report.review)));
+  const reviewWarnings = [...new Set([...(report.review.reportWarnings || []), ...(report.review.review.reportWarnings || [])])];
+  if (reviewWarnings.length) lines.push('', '**阅读提示**', ...reviewWarnings.map((text) => `- ${escape(text)}`));
   if (report.analysis) {
     lines.push('', '## 深入分析', '', `工作盘：${escape(candidateLabel(report.analysis.analysis.selected_candidate_id))}`, '', escape(report.analysis.analysis.overview));
     for (const part of report.analysis.analysis.sections) lines.push('', `### ${escape(part.domain)}`, '', escape(part.text), '', '**命盘解释依据**', ...part.chart_basis.map((text) => `- ${escape(text)}`), '', '**已知资料**', ...part.evidence_ids.map((id) => `- ${escape(evidenceText(id))}`), '', '**不确定性**', ...part.uncertainties.map((text) => `- ${escape(text)}`));
     lines.push('', '### 条件性情景', ...report.analysis.analysis.scenarios.flatMap((item) => ['', `- 条件：${escape(item.condition)}`, `  推演：${escape(item.implication)}`]), '', '**分析边界**', ...report.analysis.analysis.limitations.map((text) => `- ${escape(text)}`), '', escape(usageText(report.analysis)));
+    const analysisWarnings = [...new Set([...(report.analysis.reportWarnings || []), ...(report.analysis.analysis.reportWarnings || [])])];
+    if (analysisWarnings.length) lines.push('', '**阅读提示**', ...analysisWarnings.map((text) => `- ${escape(text)}`));
   }
   return lines.join('\n');
 }

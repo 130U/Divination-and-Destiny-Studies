@@ -4,6 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="color-scheme" content="light">
+  <meta name="description" content="填写出生资料，生成本地候选盘，再由 AI 校盘与分析。个人背景可选，留空按未知处理。">
   <title>八字校盘与分析 · Divination and Destiny Studies</title>
   <link rel="stylesheet" href="/styles.css">
   <script src="/app.js" type="module"></script>
@@ -13,23 +14,24 @@
   <header class="site-header">
     <a class="brand" href="#main"><span class="brand-mark" aria-hidden="true">八</span><span>八字校盘与分析<small>DIVINATION &amp; DESTINY STUDIES</small></span></a>
     <div class="provider"><span id="provider-status" class="status-pill">正在读取服务状态</span><button id="refresh-status" class="text-button" type="button">刷新</button></div>
+    <button id="menu-toggle" class="menu-toggle" type="button" aria-controls="work-navigation" aria-expanded="false">目录 <span aria-hidden="true">＋</span></button>
   </header>
   <main id="main" class="workspace">
-    <aside class="side-nav" aria-label="填写步骤">
+    <aside id="work-navigation" class="side-nav" aria-label="填写步骤">
       <p class="eyebrow">本次工作</p>
-      <nav><a href="#birth-section"><span>01</span> 出生资料</a><a href="#questionnaire-section"><span>02</span> 完整问卷</a><a href="#candidate-section"><span>03</span> 候选与校盘</a><a href="#analysis-section"><span>04</span> 深入分析</a></nav>
+      <nav><a href="#birth-section" aria-current="step"><span>01</span> 出生资料</a><a href="#questionnaire-section"><span>02</span> 补充背景</a><a href="#candidate-section"><span>03</span> 候选与校盘</a><a href="#analysis-section"><span>04</span> 深入分析</a></nav>
       <p class="privacy-note">资料仅临时保存在服务内存中。点击 AI 按钮时，相关资料才会发送至 DeepSeek。</p>
       <button id="clear-session" class="text-button danger" type="button">清除本次资料</button>
     </aside>
     <div class="main-column">
-      <div class="intro"><p class="eyebrow">资料先行 · 保留不确定性</p><h1>从你的资料开始。</h1><p>先完成出生资料和全部适用问卷，再查看本地候选盘。你可以明确选择不知道或不适用，无需补造经历。</p></div>
+      <div class="intro"><p class="eyebrow">Divination and Destiny Studies</p><h1>从出生资料，<br>开始这次分析。</h1><p>填写出生资料，即可生成候选盘并继续 AI 校盘与分析。经历和现实背景可以稍后补充；信息越具体，分析越能结合你的处境。</p><a class="intro-link" href="#birth-section">填写出生资料 <span aria-hidden="true">↗</span></a></div>
       <div id="status-message" class="notice" role="status" aria-live="polite" aria-atomic="true" hidden></div>
       <div id="error-message" class="notice error" role="alert" tabindex="-1" hidden></div>
       <form id="intake-form" novalidate>
         <fieldset id="intake-fields" class="form-shell">
-          <legend class="sr-only">出生资料与完整问卷</legend>
+          <legend class="sr-only">出生资料与可选背景</legend>
           <section id="birth-section" class="panel">
-            <div class="section-heading"><span class="step-number">01</span><div><h2>出生资料</h2><p>保留原始记录，不确定的时间交给候选盘呈现。</p></div></div>
+            <div class="section-heading"><span class="step-number">01 / 必填</span><div><h2>出生资料</h2><p>保留原始记录，不确定的时间交给候选盘呈现。</p></div></div>
             <div class="form-grid">
               <div class="field"><label for="calendar">历法</label><select id="calendar" name="calendar" required><option value="solar">公历</option><option value="lunar">农历</option></select></div>
               <div class="field"><span id="birth-date-label" class="field-label">出生日期</span><div class="date-parts" role="group" aria-labelledby="birth-date-label"><label class="sr-only" for="birth-year">出生年</label><input id="birth-year" type="number" min="1900" placeholder="年" inputmode="numeric" required><label class="sr-only" for="birth-month">出生月</label><input id="birth-month" type="number" min="1" max="12" placeholder="月" inputmode="numeric" required><label class="sr-only" for="birth-day">出生日</label><input id="birth-day" type="number" min="1" max="31" placeholder="日" inputmode="numeric" required></div><label id="leap-field" class="check-line" hidden><input id="leap-month" type="checkbox"> 农历闰月</label><small>问卷支持 1900 年至今天；农历日期换算为公历后核验。</small></div>
@@ -43,22 +45,22 @@
             </div>
           </section>
           <section id="questionnaire-section" class="panel questionnaire-panel">
-            <div class="section-heading"><span class="step-number">02</span><div><h2>完整问卷</h2><p>校盘线索与现实背景分别记录；用户自述不等同于独立验证。</p></div><span id="question-progress" class="count-pill">读取题目中</span></div>
+            <div class="section-heading"><span class="step-number">02 / 可选</span><div><h2>补充背景</h2><p>可以全部跳过。留空按未知处理，不会阻止生成报告；已经填写的经历会保留并核对。</p></div><span id="question-progress" class="count-pill">读取题目中</span></div>
             <div id="questionnaire-content"><p class="muted">正在加载问卷配置…</p></div>
           </section>
-          <div class="submit-bar"><div><strong id="completion-summary">请先完成资料</strong><small>提交仅生成本地候选盘，不调用 AI。</small></div><button id="submit-intake" class="button primary" type="submit" disabled>生成候选盘 <span aria-hidden="true">→</span></button></div>
+          <div class="submit-bar"><div><strong id="completion-summary">出生资料填写后即可继续</strong><small>背景全部可选。此步只生成本地候选盘，不调用 AI。</small></div><button id="submit-intake" class="button primary" type="submit" disabled>生成候选盘 <span aria-hidden="true">↗</span></button></div>
         </fieldset>
       </form>
       <section id="candidate-section" class="panel" hidden>
         <div class="section-heading"><span class="step-number">03</span><div><h2>候选盘与 AI 校盘</h2><p id="candidate-summary"></p></div></div>
         <div id="candidate-warnings"></div><div id="candidate-list" class="candidate-grid"></div>
-        <div class="action-box"><div><h3>让 AI 对照校盘线索</h3><p>点击后，将候选盘与校盘问卷发送至 DeepSeek。推荐只是暂定工作盘，会保留矛盾、备选和证据不足的情况。</p></div><button id="review-button" class="button primary" type="button">一次 AI 校盘</button></div>
-        <p id="review-call-status" class="call-status" role="status" aria-live="polite"></p><div id="review-result"></div>
+        <div class="action-box"><div><h3>比较候选，确定暂用盘</h3><p>点击后，将候选盘和已提供的校盘线索发送至 DeepSeek。没有背景也可继续；暂用盘用于展开分析，不代表出生时辰已被证实。</p></div><button id="review-button" class="button primary" type="button">开始 AI 校盘</button></div>
+        <p id="review-call-status" class="call-status" role="status" aria-live="polite" tabindex="-1" hidden></p><div id="review-result"></div>
       </section>
       <section id="analysis-section" class="panel" hidden>
         <div class="section-heading"><span class="step-number">04</span><div><h2>深入分析</h2><p>将工作盘与现实背景结合，分别呈现已知事实、解释与条件性情景。</p></div></div>
         <div class="working-chart"><div class="field"><label for="selected-candidate">本次分析使用的工作盘</label><select id="selected-candidate"><option value="">请选择工作盘</option></select><small id="selection-note"></small></div><button id="analysis-button" class="button primary" type="button">生成深入分析</button></div>
-        <p id="analysis-call-status" class="call-status" role="status" aria-live="polite"></p><div id="analysis-result"></div>
+        <p id="analysis-call-status" class="call-status" role="status" aria-live="polite" tabindex="-1" hidden></p><div id="analysis-result"></div>
       </section>
       <section id="report-section" class="report-bar" hidden><div><h2>保存这次记录</h2><p>报告包含你提交的个人资料，请自行妥善保存。</p></div><div class="button-row"><button id="download-json" class="button secondary" type="button">下载 JSON</button><button id="download-markdown" class="button secondary" type="button">下载 Markdown</button></div></section>
       <footer>本工具用于命理研究与自我梳理。模型推荐不是经过校准的概率，也不能证明真实出生时辰。</footer>

@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   buildEvidence,
   getQuestionnaire,
+  normalizeAnswers,
   QuestionnaireValidationError,
   validateAnswers,
 } from "../src/questionnaire.ts";
@@ -49,12 +50,14 @@ test("questionnaire provides 27 uniquely named questions in two sections and pre
   assert.deepEqual(questionnaire.sections.map((section) => [section.id, section.questions.length]), [["evidence", 17], ["context", 10]]);
   const questions = questionnaire.sections.flatMap((section) => section.questions);
   assert.equal(new Set(questions.map((question) => question.id)).size, 27);
-  assert.ok(questions.every((question) => question.required && question.sourceRequired === false));
+  assert.ok(questions.every((question) => !question.required && question.sourceRequired === false));
   assert.ok(questions.every((question) => question.label && question.type && question.stage && question.purpose));
   assert.ok(questions.every((question) => !question.id.startsWith("A")));
   assert.equal(questionnaire.provenance.sourceVersion, "1.1");
   assert.match(questionnaire.provenance.sourceFileSha256, /^[a-f0-9]{64}$/);
-  assert.equal(questionnaire.completionPolicy.allApplicableBeforeAI, true);
+  assert.equal(questionnaire.completionPolicy.allApplicableBeforeAI, false);
+  assert.equal(questionnaire.completionPolicy.questionnaireOptional, true);
+  assert.ok(questionnaire.applicabilityQuestions.every((question) => !question.required));
   assert.equal(questionnaire.sections[0]!.questions.find((question) => question.id === "C7_career_years")!.condition, "current_identity_is_working_or_has_work_history");
 });
 
@@ -76,7 +79,7 @@ test("a complete synthetic submission and explicit unknown answers are valid wit
   assert.ok([...bundle.evidence, ...bundle.context].every((item) => item.informationStatus === "unknown"));
 });
 
-test("all applicable questions need an explicit reply, including context questions", () => {
+test("the internal validator still checks a fully normalized answer set", () => {
   const submission = completeUnknown();
   delete submission.responses.B1_hair_whorl;
   delete submission.responses.D10_recent_focus_or_anxiety;
@@ -85,7 +88,7 @@ test("all applicable questions need an explicit reply, including context questio
   assert.equal(validation.valid, false);
 });
 
-test("a false applicability gate permits omission without inventing a response", () => {
+test("a false applicability gate permits omission and is represented as not applicable", () => {
   const submission = completeUnknown();
   submission.applicability.current_identity_is_working_or_has_work_history = false;
   submission.applicability.childbearing_applicable = false;
@@ -93,8 +96,8 @@ test("a false applicability gate permits omission without inventing a response",
   delete submission.responses.C8_childbearing_years;
   assert.equal(validateAnswers(submission, reference).valid, true);
   const bundle = buildEvidence(submission, reference);
-  assert.equal(bundle.evidence.length, 15);
-  assert.equal(bundle.evidence.some((item) => item.id === "C7_career_years"), false);
+  assert.equal(bundle.evidence.length, 17);
+  assert.deepEqual(bundle.evidence.find((item) => item.id === "C7_career_years")!.answer, { status: "not_applicable" });
 });
 
 test("unknown applicability does not silently skip a question", () => {
@@ -226,7 +229,7 @@ test("structured evidence has stable IDs, separates purposes and does not claim 
   assert.ok([...bundle.evidence, ...bundle.context].every((item) => item.source === "user_report" && item.independentlyVerified === false && !("score" in item) && !("confidence" in item)));
   bundle.evidence[0]!.answer = { status: "unknown" };
   assert.notEqual(input.responses.B1_hair_whorl!.status, "unknown");
-  assert.throws(() => buildEvidence({ responses: {}, applicability: {} }, reference), QuestionnaireValidationError);
+  assert.throws(() => buildEvidence({ responses: [], applicability: {} }, reference), QuestionnaireValidationError);
 });
 
 test("malformed object event fields are rejected rather than coerced or serialized", () => {
@@ -235,4 +238,36 @@ test("malformed object event fields are rejected rather than coerced or serializ
   const result = validateAnswers(withResponse("C1_major_turning_years", { status: "answered", value: [{ year: 2020, description: "合成事件", date: cyclic, eventType: cyclic }] }), reference);
   assert.equal(result.valid, false);
   assert.ok(result.errors.some((issue) => issue.code === "invalid_date"));
+});
+
+test("an omitted or partial questionnaire is normalized without inventing facts", () => {
+  for (const input of [undefined, {}, { responses: {} }, { applicability: {} }]) {
+    const normalized = normalizeAnswers(input, reference);
+    assert.equal(Object.keys(normalized.responses).length, 27);
+    assert.ok(Object.values(normalized.responses).every((answer) => answer.status === "unknown"));
+    assert.ok(Object.values(normalized.applicability).every((answer) => answer === "unknown"));
+    assert.equal(validateAnswers(normalized, reference).valid, true);
+    assert.ok([...buildEvidence(input, reference).evidence, ...buildEvidence(input, reference).context].every((item) => item.informationStatus === "unknown"));
+  }
+});
+
+test("partial known answers survive normalization, explicit false gates fill only missing inapplicable answers", () => {
+  const partial = { responses: { D3_family_support_style: { status: "answered", value: "limited_support" } }, applicability: { childbearing_applicable: false } };
+  const before = structuredClone(partial);
+  const normalized = normalizeAnswers(partial, reference);
+  assert.deepEqual(partial, before);
+  assert.deepEqual(normalized.responses.D3_family_support_style, partial.responses.D3_family_support_style);
+  assert.deepEqual(normalized.responses.C8_childbearing_years, { status: "not_applicable" });
+  assert.deepEqual(normalized.responses.C7_career_years, { status: "unknown" });
+  assert.equal(buildEvidence(partial, reference).context.find((item) => item.id === "D3_family_support_style")!.informationStatus, "known");
+});
+
+test("optional intake still rejects invalid values, extra fields, contradictions and future dates", () => {
+  const invalid = [null, [], { extra: true }, { responses: null }, { applicability: { unknown_gate: false } },
+    { responses: { invented_question: { status: "unknown" } } },
+    { responses: { B1_hair_whorl: { status: "answered", value: "invented" } } },
+    { responses: { C1_major_turning_years: { status: "answered", value: [{ year: 2027, description: "合成未来记录" }] } } },
+    { responses: { D6_current_identity: { status: "answered", value: "professional" } }, applicability: { current_identity_is_working_or_has_work_history: false } },
+  ];
+  for (const input of invalid) assert.throws(() => normalizeAnswers(input, reference), QuestionnaireValidationError);
 });

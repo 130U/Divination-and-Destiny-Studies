@@ -1,5 +1,5 @@
 {
-  "version": "1.0.0",
+  "version": "1.1.0",
   "provenance": {
     "sourceRepository": "130U/bazi-context-agent",
     "sourcePath": "configs/question_bank.v1.json",
@@ -10,19 +10,23 @@
     "authorization": "用户授权在新仓库复用问卷设计；旧仓库只读。",
     "revisionNote": "checkout revision 仅记录读取时的 HEAD；实际复制内容由 sourceFileSha256 标识，不假设工作区文件与该提交完全一致。",
     "adaptations": [
-      "保留 B/C/D 题目 ID、原文、选项、适用条件和数量/长度上限；出生 A 组由独立表单处理。",
-      "取消旧自适应问答和锁盘后才收集 context 的元策略；所有适用题在任何 AI 调用前均需明确回复。",
-      "sourceRequired 记录旧值；required 统一表示必须回复，可选择不知道或不适用，不要求虚构实质答案。",
-      "新增两道适用性确认和统一回复状态；symbol 仅作传统线索，用户经历不构成独立验证命中。"
+      "保留 B/C/D 题目 ID、原文、选项、适用条件和数量/长度上限；出生 A 组由独立必填表单处理。",
+      "问卷和适用性确认均可省略或部分填写；未提供的回答规范化为 unknown，缺失适用性规范化为 unknown。",
+      "sourceRequired 记录旧值；required=false 表示背景问卷可选，不要求补造经历或为了分析完成全部问题。",
+      "条件明确为 false 时，缺失的对应回答规范化为 not_applicable；已提交的非法值、矛盾及未来事件仍拒绝。",
+      "传统 symbol 只作弱线索；用户自述不构成独立验证命中。无已知背景时仍可进行暂定选盘和纯命盘分析。"
     ]
   },
   "completionPolicy": {
-    "allApplicableBeforeAI": true,
+    "allApplicableBeforeAI": false,
     "allowUnknown": true,
     "allowNotApplicable": true,
-    "skipOnlyWhenConditionFalse": true,
+    "skipOnlyWhenConditionFalse": false,
     "evidenceSource": "user_report",
-    "independentlyVerified": false
+    "independentlyVerified": false,
+    "questionnaireOptional": true,
+    "missingAnswerStatus": "unknown",
+    "missingApplicability": "unknown"
   },
   "answerStatuses": [
     {
@@ -73,7 +77,7 @@
       "id": "current_identity_is_working_or_has_work_history",
       "label": "你目前在工作，或曾有工作经历吗？",
       "type": "single_choice",
-      "required": true,
+      "required": false,
       "options": [
         {
           "id": "true",
@@ -102,7 +106,7 @@
       "id": "childbearing_applicable",
       "label": "与子女或生育有关的重要经历是否适用于你？",
       "type": "single_choice",
-      "required": true,
+      "required": false,
       "options": [
         {
           "id": "true",
@@ -131,7 +135,7 @@
           "stage": "symbol_prior",
           "stageLabel": "传统验时辰 Symbol 问卷",
           "purpose": "rectification_matching",
-          "required": true,
+          "required": false,
           "sourceRequired": false,
           "options": [
             {
@@ -162,7 +166,7 @@
           "stage": "symbol_prior",
           "stageLabel": "传统验时辰 Symbol 问卷",
           "purpose": "rectification_matching",
-          "required": true,
+          "required": false,
           "sourceRequired": false,
           "options": [
             {
@@ -201,7 +205,7 @@
           "stage": "symbol_prior",
           "stageLabel": "传统验时辰 Symbol 问卷",
           "purpose": "rectification_matching",
-          "required": true,
+          "required": false,
           "sourceRequired": false,
           "options": [
             {
@@ -236,7 +240,7 @@
           "stage": "symbol_prior",
           "stageLabel": "传统验时辰 Symbol 问卷",
           "purpose": "rectification_matching",
-          "required": true,
+          "required": false,
           "sourceRequired": false,
           "options": [
             {
@@ -267,7 +271,7 @@
           "stage": "symbol_prior",
           "stageLabel": "传统验时辰 Symbol 问卷",
           "purpose": "rectification_matching",
-          "required": true,
+          "required": false,
           "sourceRequired": false,
           "options": [
             {
@@ -298,7 +302,7 @@
           "stage": "symbol_prior",
           "stageLabel": "传统验时辰 Symbol 问卷",
           "purpose": "rectification_matching",
-          "required": true,
+          "required": false,
           "sourceRequired": false,
           "options": [
             {
@@ -329,7 +333,7 @@
           "stage": "symbol_prior",
           "stageLabel": "传统验时辰 Symbol 问卷",
           "purpose": "rectification_matching",
-          "required": true,
+          "required": false,
           "sourceRequired": false,
           "options": [
             {
@@ -360,7 +364,7 @@
           "stage": "symbol_prior",
           "stageLabel": "传统验时辰 Symbol 问卷",
           "purpose": "rectification_matching",
-          "required": true,
+          "required": false,
           "sourceRequired": false,
           "options": [
             {
@@ -395,7 +399,7 @@
           "stage": "event_backtest",
           "stageLabel": "重大年份回测",
           "purpose": "rectification_matching",
-          "required": true,
+          "required": false,
           "sourceRequired": false,
           "maxItems": 3,
           "eventType": "major_turning"
@@ -407,7 +411,7 @@
           "stage": "event_backtest",
           "stageLabel": "重大年份回测",
           "purpose": "rectification_matching",
-          "required": true,
+          "required": false,
           "sourceRequired": false,
           "maxItems": 2,
           "eventType": "education"
@@ -419,7 +423,7 @@
           "stage": "event_backtest",
           "stageLabel": "重大年份回测",
           "purpose": "rectification_matching",
-          "required": true,
+          "required": false,
           "sourceRequired": false,
           "maxItems": 2,
           "eventType": "relocation"
@@ -431,7 +435,7 @@
           "stage": "event_backtest",
           "stageLabel": "重大年份回测",
           "purpose": "rectification_matching",
-          "required": true,
+          "required": false,
           "sourceRequired": false,
           "maxItems": 2,
           "eventType": "relationship"
@@ -443,7 +447,7 @@
           "stage": "event_backtest",
           "stageLabel": "重大年份回测",
           "purpose": "rectification_matching",
-          "required": true,
+          "required": false,
           "sourceRequired": false,
           "maxItems": 2,
           "eventType": "health_or_accident"
@@ -455,7 +459,7 @@
           "stage": "event_backtest",
           "stageLabel": "重大年份回测",
           "purpose": "rectification_matching",
-          "required": true,
+          "required": false,
           "sourceRequired": false,
           "maxItems": 2,
           "eventType": "family_change"
@@ -467,7 +471,7 @@
           "stage": "event_backtest",
           "stageLabel": "重大年份回测",
           "purpose": "rectification_matching",
-          "required": true,
+          "required": false,
           "sourceRequired": false,
           "maxItems": 2,
           "eventType": "career",
@@ -480,7 +484,7 @@
           "stage": "event_backtest",
           "stageLabel": "重大年份回测",
           "purpose": "rectification_matching",
-          "required": true,
+          "required": false,
           "sourceRequired": false,
           "maxItems": 2,
           "eventType": "childbearing",
@@ -493,7 +497,7 @@
           "stage": "event_backtest",
           "stageLabel": "重大年份回测",
           "purpose": "rectification_matching",
-          "required": true,
+          "required": false,
           "sourceRequired": false,
           "maxItems": 2,
           "eventTypeOptions": [
@@ -520,7 +524,7 @@
           "stage": "context_box",
           "stageLabel": "信息框：现实初始值",
           "purpose": "contextual_analysis",
-          "required": true,
+          "required": false,
           "sourceRequired": false,
           "maxLength": 160
         },
@@ -531,7 +535,7 @@
           "stage": "context_box",
           "stageLabel": "信息框：现实初始值",
           "purpose": "contextual_analysis",
-          "required": true,
+          "required": false,
           "sourceRequired": false,
           "maxLength": 240
         },
@@ -542,7 +546,7 @@
           "stage": "context_box",
           "stageLabel": "信息框：现实初始值",
           "purpose": "contextual_analysis",
-          "required": true,
+          "required": false,
           "sourceRequired": false,
           "options": [
             {
@@ -577,7 +581,7 @@
           "stage": "context_box",
           "stageLabel": "信息框：现实初始值",
           "purpose": "contextual_analysis",
-          "required": true,
+          "required": false,
           "sourceRequired": false,
           "options": [
             {
@@ -621,7 +625,7 @@
           "stage": "context_box",
           "stageLabel": "信息框：现实初始值",
           "purpose": "contextual_analysis",
-          "required": true,
+          "required": false,
           "sourceRequired": false,
           "options": [
             {
@@ -664,7 +668,7 @@
           "stage": "context_box",
           "stageLabel": "信息框：现实初始值",
           "purpose": "contextual_analysis",
-          "required": true,
+          "required": false,
           "sourceRequired": false,
           "options": [
             {
@@ -711,7 +715,7 @@
           "stage": "context_box",
           "stageLabel": "信息框：现实初始值",
           "purpose": "contextual_analysis",
-          "required": true,
+          "required": false,
           "sourceRequired": false,
           "maxLength": 240
         },
@@ -722,7 +726,7 @@
           "stage": "context_box",
           "stageLabel": "信息框：现实初始值",
           "purpose": "contextual_analysis",
-          "required": true,
+          "required": false,
           "sourceRequired": false,
           "maxLength": 320
         },
@@ -733,7 +737,7 @@
           "stage": "context_box",
           "stageLabel": "信息框：现实初始值",
           "purpose": "contextual_analysis",
-          "required": true,
+          "required": false,
           "sourceRequired": false,
           "options": [
             {
@@ -778,7 +782,7 @@
           "stage": "context_box",
           "stageLabel": "信息框：现实初始值",
           "purpose": "contextual_analysis",
-          "required": true,
+          "required": false,
           "sourceRequired": false,
           "options": [
             {
