@@ -130,7 +130,7 @@ test("not applicable is an explicit answer, never a made-up substantive value", 
   assert.equal(buildEvidence(submission, reference).evidence.find((item) => item.id === "C5_health_or_accident_years")!.informationStatus, "not_applicable");
 });
 
-test("rejects malformed envelopes, unknown question IDs, old birth fields, and unknown gates", () => {
+test("rejects malformed envelopes, unknown question IDs, birth fields outside the questionnaire schema, and unknown gates", () => {
   for (const input of [null, [], "answers", new Date()]) rejected(input, "invalid_object");
   rejected({ responses: [], applicability: {} }, "invalid_object");
   rejected({ ...completeUnknown(), extra: true }, "extra_field");
@@ -157,7 +157,7 @@ test("rejects invalid status, missing choice, arbitrary choice values, and dupli
   rejected(withResponse("D4_family_values", { status: "answered", value: ["unknown", "independence"] }), "conflicting_choices");
 });
 
-test("preserves source choice IDs while marking legacy unknown options as uncertain", () => {
+test("preserves source choice IDs while marking unknown-answer options as uncertain", () => {
   const submission = completeUnknown();
   submission.responses.B3_siblings = { status: "answered", value: "complex_unknown" };
   submission.responses.B6_sleep_posture = { status: "answered", value: "varies_unknown" };

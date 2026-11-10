@@ -1,6 +1,6 @@
 # Divination and Destiny Studies
 
-Work only in this repository. The user's `130U/bazi-context-agent` is a read-only source of questionnaire design; do not modify or publish to it.
+This repository contains the static online BYOK app and its local Node runtime. Questionnaire provenance is documented in `docs/QUESTIONNAIRE.md`.
 
 ## Product boundary
 
@@ -23,4 +23,4 @@ Work only in this repository. The user's `130U/bazi-context-agent` is a read-onl
 
 ## Completion
 
-Report implemented behavior, changed areas, tests, actual model-call status, remaining limitations, and the new repository commit. Verify that the old repository stayed unchanged.
+Report implemented behavior, changed areas, tests, actual model-call status, remaining limitations, and the new repository commit. Record any changes to questionnaire provenance explicitly.

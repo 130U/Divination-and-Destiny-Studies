@@ -11,7 +11,7 @@ export interface CandidateAssessment {
 }
 export interface ChartReview {
   status: 'recommended' | 'provisional' | 'ambiguous' | 'insufficient_evidence';
-  // Legacy model inputs may contain null; validated results always select a real candidate.
+  // Model inputs may contain null; validated results always select a real candidate.
   recommended_candidate_id: string | null;
   ranking: CandidateAssessment[];
   alternatives: string[];

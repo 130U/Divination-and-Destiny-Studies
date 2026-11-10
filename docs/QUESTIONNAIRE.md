@@ -4,7 +4,7 @@ This module separates optional responses into chart-comparison evidence and anal
 
 ## Source and Adaptation
 
-The question design was reused, with the user's authorization, from `configs/question_bank.v1.json` in `130U/bazi-context-agent`, source version `1.1`. The old repository's HEAD at the time of reading was `b277fec462bada4c09ac651ed02a68d25ccd935d`; the actual source file's SHA-256 was `a10cac9ad1928d702f81e3b71fcc8bcf51e5c025279192fcaab0aa3c50b135ff`. HEAD identifies the checkout at that time, while the file hash identifies the copied content. The source working-tree file is not assumed to match that commit. The old repository was read only.
+The question design was reused, with the user's authorization, from `configs/question_bank.v1.json` in `130U/bazi-context-agent`, source version `1.1`. The source checkout's HEAD at the time of reading was `b277fec462bada4c09ac651ed02a68d25ccd935d`; the actual source file's SHA-256 was `a10cac9ad1928d702f81e3b71fcc8bcf51e5c025279192fcaab0aa3c50b135ff`. HEAD identifies the checkout at that time, while the file hash identifies the copied content. The source working-tree file is not assumed to match that commit.
 
 The adapted question bank is version `1.1.0`, with full provenance in its JSON `provenance` field. It retains all 27 question IDs in groups B, C, and D, their original wording, option IDs and labels, event types, applicability conditions, and count and length limits. Birth-information group A is handled by a separate required form and is not part of `responses`.
 

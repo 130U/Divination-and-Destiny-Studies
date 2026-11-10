@@ -126,7 +126,7 @@ test('hallucinated and missing candidates are still rejected', async () => {
   }
 });
 
-test('a legacy ambiguous response derives a transparent provisional choice from its complete ranking', async () => {
+test('an ambiguous model response derives a transparent provisional choice from its complete ranking', async () => {
   const workflow = new Workflow({ client: { completeJson: async request => {
     const data = fakeModelData(request);
     if ('ranking' in data) { data.status = 'ambiguous'; data.recommended_candidate_id = null; }
