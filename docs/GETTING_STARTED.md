@@ -62,8 +62,8 @@ npm run test:live
 npm run test:live -- --birth-only --single-candidate
 ```
 
-These commands are alternatives; there is no need to run both consecutively. The second uses synthetic input with blank background answers and one candidate at an exact minute. Each script run allows at most two attempts, does not retry automatically, and reports `LIVE_NOT_RUN` when unconfigured. Historical records do not mean this argument combination or the current public website has been separately tested live.
+These commands are alternatives; there is no need to run both consecutively. The second uses synthetic input with blank background answers and one candidate at an exact minute. Each script run allows at most two attempts, does not retry automatically, and reports `LIVE_NOT_RUN` when unconfigured.
 
-The [validation record](VALIDATION.md) separately documents the 90 offline tests and two-stage live local-browser run for 0.2.0, and the earlier 0.1.0 example. These are engineering acceptance checks for their respective versions. They do not automatically establish that the 0.3.0 public deployment works, or validate BaZi interpretations or predictions. Deployment and direct-browser claims must follow the explicitly recorded acceptance checks for the relevant version.
+The [validation record](VALIDATION.md) documents automated checks, public-browser evidence, and live bundle contract evidence. Engineering acceptance does not establish birth-hour identification or predictive validity. Public deployment checks must match the deployed commit.
 
 Further documentation: [API contract](API.md), [architecture](ARCHITECTURE.md), [DeepSeek integration](DEEPSEEK.md), [questionnaire](QUESTIONNAIRE.md), and [calendar conventions](ZHENYI_INTEGRATION.md).

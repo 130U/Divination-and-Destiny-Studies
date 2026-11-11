@@ -168,10 +168,6 @@ The current status version is `0.3.0`. Both modes report `questionnaire: "option
 
 The web app uses the fixed endpoint `https://api.deepseek.com/chat/completions` with `credentials: "omit"` and `referrerPolicy: "no-referrer"`. Authentication failures, insufficient balance, rate limits, network failures, and cross-origin errors are reported explicitly without automatic retries. If the Node app is separately shared with others, their requests still use the operator's key. That is not the architecture of the current static web app.
 
-## Completed synthetic acceptance checks
+## Validation
 
-The following checks cover historical local versions. They do not establish public deployment or direct-browser acceptance for 0.3.0. See the [validation record](VALIDATION.md) for the checks performed on each version.
-
-Version 0.2.0 completed a live browser acceptance check on 2026-10-28 using synthetic birth data, all 27 questions left blank, and a single candidate. Both stages succeeded, producing four analysis sections. Review used 4,656 tokens in 6,852 ms; analysis used 11,053 tokens in 39,336 ms; the combined total was 15,709 tokens. All 90 offline tests passed.
-
-The historical 0.1.0 rerun on the same date used 24,353 tokens across two requests. Its three-candidate review returned `insufficient_evidence`; the script explicitly selected a chart to continue analysis, and repeated cached operations made no additional requests. An earlier first run failed analysis citation validation and did not retain usage. These are separate acceptance checks and their totals are not combined. API acceptance does not prove birth-hour identification or predictive validity; see the [validation record](VALIDATION.md).
+See the [validation record](VALIDATION.md) for automated checks, public-browser evidence, and live bundle contract evidence. These checks establish engineering behavior, not birth-hour identification or predictive validity.

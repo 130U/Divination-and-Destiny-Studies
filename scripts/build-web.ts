@@ -20,7 +20,8 @@ const html = (await readFile(new URL('public/index.html', root), 'utf8'))
   .replace('<meta name="color-scheme"', '<meta http-equiv="Content-Security-Policy" content="default-src \'self\'; script-src \'self\'; style-src \'self\'; connect-src \'self\' https://api.deepseek.com; img-src \'self\' data:; object-src \'none\'; base-uri \'none\'; form-action \'none\'"><meta name="referrer" content="no-referrer"><meta name="color-scheme"');
 await writeFile(new URL('index.html', output), html);
 for (const asset of ['app.js', 'styles.css']) await copyFile(new URL('public/' + asset, root), new URL(asset, output));
-for (const asset of ['LICENSE', 'THIRD_PARTY_NOTICES.md']) await copyFile(new URL(asset, root), new URL(asset, output));
+await copyFile(new URL('LICENSE', root), new URL('LICENSE', output));
+await copyFile(new URL('docs/THIRD_PARTY_NOTICES.md', root), new URL('THIRD_PARTY_NOTICES.md', output));
 const thirdPartyLicenses = await Promise.all(['vendor/zhenyi/LICENSE', 'node_modules/@noble/hashes/LICENSE'].map(path => readFile(new URL(path, root), 'utf8')));
 await writeFile(new URL('THIRD_PARTY_LICENSES.txt', output), thirdPartyLicenses.join('\n\n---\n\n'));
 await writeFile(new URL('.nojekyll', output), '');

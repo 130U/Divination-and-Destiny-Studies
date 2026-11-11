@@ -5,7 +5,7 @@
 - Upstream: [ZHENYI-ORG/Zhenyi-bazi](https://github.com/ZHENYI-ORG/Zhenyi-bazi).
 - Pinned revision: [`383a726437a81db2b87eed517ef5e6ccd30b7bd4`](https://github.com/ZHENYI-ORG/Zhenyi-bazi/tree/383a726437a81db2b87eed517ef5e6ccd30b7bd4).
 - Copyright: Copyright (c) 2026 ZhenYi.
-- License: MIT. The complete original text is retained in [`vendor/zhenyi/LICENSE`](vendor/zhenyi/LICENSE).
+- License: MIT. The complete original text is retained in [`vendor/zhenyi/LICENSE`](../vendor/zhenyi/LICENSE).
 
 The following five files are retained unchanged from the pinned revision:
 
@@ -17,7 +17,7 @@ The following five files are retained unchanged from the pinned revision:
 | `dist/data/eot.json` | `vendor/zhenyi/data/eot.json` | Equation-of-time data |
 | `LICENSE` | `vendor/zhenyi/LICENSE` | Original copyright and license |
 
-[`SOURCE_MANIFEST.json`](vendor/zhenyi/SOURCE_MANIFEST.json) records each file's pinned source URL, byte count, SHA-256 hash, and upstream Git blob identity. The additional `package.json` and manifest in the vendor directory are this project's loading configuration and provenance records, not original upstream files. `npm run check` includes the integrity check.
+[`SOURCE_MANIFEST.json`](../vendor/zhenyi/SOURCE_MANIFEST.json) records each file's pinned source URL, byte count, SHA-256 hash, and upstream Git blob identity. The additional `package.json` and manifest in the vendor directory are this project's loading configuration and provenance records, not original upstream files. `npm run check` includes the integrity check.
 
 This project's time-coordinate wrapper and application workflow are independently implemented. The full upstream `BlindJudgmentEngine`, AI prompts, commercial backend, interface, icons, fonts, geographic database, and private cases were not copied. The copied files retain their MIT notices; this statement does not extend to upstream material excluded from this project. The MIT license is not an endorsement of the validity of chart interpretations or predictions.
 
@@ -25,11 +25,11 @@ This project's time-coordinate wrapper and application workflow are independentl
 
 The question design comes from project owner `130U`'s `bazi-context-agent/configs/question_bank.v1.json`, with the owner's explicit authorization to copy and adapt it. The source version is `1.1`. The checkout revision at the time of reading was `b277fec462bada4c09ac651ed02a68d25ccd935d`; the SHA-256 hash of the actual source file was `a10cac9ad1928d702f81e3b71fcc8bcf51e5c025279192fcaab0aa3c50b135ff`.
 
-The new question bank preserves the B/C/D question IDs, original wording, options, and applicability conditions, while adapting collection order and completeness rules. Source information, the actual content hash, and adaptation notes are recorded in the `provenance` field of [`configs/question_bank.v1.json`](configs/question_bank.v1.json). This records owner authorization for specific content; it does not claim a general third-party open-source license for all material in the original repository. The app neither depends on nor modifies that repository at runtime.
+The new question bank preserves the B/C/D question IDs, original wording, options, and applicability conditions, while adapting collection order and completeness rules. Source information, the actual content hash, and adaptation notes are recorded in the `provenance` field of [`configs/question_bank.v1.json`](../configs/question_bank.v1.json). This records owner authorization for specific content; it does not claim a general third-party open-source license for all material in the original repository. The app neither depends on nor modifies that repository at runtime.
 
 ## Dependencies and external services
 
-Dependency versions and license metadata are recorded in [`package-lock.json`](package-lock.json):
+Dependency versions and license metadata are recorded in [`package-lock.json`](../package-lock.json):
 
 | Development dependency | Locked version | License metadata |
 | --- | --- | --- |

@@ -32,6 +32,6 @@ The current interface and generated reports are in Simplified Chinese. Repositor
 
 Birth-time identification and future prediction accuracy have not been established. A candidate's rank is not a calibrated probability. See the [validation record](docs/VALIDATION.md) for engineering checks and synthetic examples.
 
-[Usage and local setup](docs/GETTING_STARTED.md) · [How it works](docs/ARCHITECTURE.md) · [API reference](docs/API.md) · [Calendar engine](docs/ZHENYI_INTEGRATION.md) · [Third-party notices](THIRD_PARTY_NOTICES.md)
+[Usage and local setup](docs/GETTING_STARTED.md) · [How it works](docs/ARCHITECTURE.md) · [API reference](docs/API.md) · [Calendar engine](docs/ZHENYI_INTEGRATION.md) · [Third-party notices](docs/THIRD_PARTY_NOTICES.md)
 
 Released under the [MIT License](LICENSE). Third-party files retain their original licenses and source records.
