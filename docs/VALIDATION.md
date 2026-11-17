@@ -37,4 +37,4 @@ These figures cover only that two-call run. Cached input and reasoning tokens ar
 
 ## Release scope
 
-The public entry is [Divination and Destiny Studies](https://www.theodoreoy.com/Divination-and-Destiny-Studies/). The Pages workflow runs the automated checks and builds the web app for each `main` commit. Current deployment acceptance requires checking that commit's workflow and public assets. Provider behavior, browser environment security and the semantic correctness of generated interpretations remain outside the guarantees of these engineering checks.
+The public entry is [Divination and Destiny Studies](https://www.theodoreoy.com/ENGINEERING-Divination-and-Destiny-Studies/). The Pages workflow runs the automated checks and builds the web app for each `main` commit. Current deployment acceptance requires checking that commit's workflow and public assets. Provider behavior, browser environment security and the semantic correctness of generated interpretations remain outside the guarantees of these engineering checks.

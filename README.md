@@ -2,7 +2,7 @@
 
 **BaZi readings that take your real life into account.**
 
-[**Try it online →**](https://www.theodoreoy.com/Divination-and-Destiny-Studies/) · [What you get](#what-you-get)
+[**Try it online →**](https://www.theodoreoy.com/ENGINEERING-Divination-and-Destiny-Studies/) · [What you get](#what-you-get)
 
 ![Divination and Destiny Studies — live product interface in Simplified Chinese](assets/product-preview.jpg)
 

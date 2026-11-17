@@ -2,7 +2,7 @@
 
 ## Online mode: use your own DeepSeek key
 
-Open the [online app](https://www.theodoreoy.com/Divination-and-Destiny-Studies/). Birth details are sufficient to generate candidates; all 27 background questions and both applicability questions are optional. The app supports Gregorian dates, lunar dates, and leap lunar months. Birth time may be an exact minute, a range within the same day, or entirely unknown. The product accepts birth dates whose converted Gregorian date falls between 1900-01-01 and the assessment date.
+Open the [online app](https://www.theodoreoy.com/ENGINEERING-Divination-and-Destiny-Studies/). Birth details are sufficient to generate candidates; all 27 background questions and both applicability questions are optional. The app supports Gregorian dates, lunar dates, and leap lunar months. Birth time may be an exact minute, a range within the same day, or entirely unknown. The product accepts birth dates whose converted Gregorian date falls between 1900-01-01 and the assessment date.
 
 AI analysis requires your own DeepSeek API key. The HTTPS page accepts the key and keeps it only in the current tab's closure memory. It is never written to localStorage, sessionStorage, URLs, logs, or exported reports. Refreshing, explicitly clearing, or leaving the page clears the key. Replacing or clearing it also clears the current session and cache and cancels local waiting. Clearing cannot withdraw requests already received by DeepSeek or guarantee cancellation of charges already incurred.
 
