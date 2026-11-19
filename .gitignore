@@ -1,0 +1,9 @@
+node_modules/
+.env*
+!.env.example
+coverage/
+dist/
+reports/
+private-data/
+*.log
+.DS_Store

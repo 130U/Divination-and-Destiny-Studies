@@ -1,0 +1,53 @@
+{
+  "repository": "https://github.com/ZHENYI-ORG/Zhenyi-bazi",
+  "revision": "383a726437a81db2b87eed517ef5e6ccd30b7bd4",
+  "retrievedAt": "2026-10-28",
+  "license": "MIT",
+  "upstreamFilesModified": false,
+  "localAdditions": [
+    "package.json",
+    "SOURCE_MANIFEST.json"
+  ],
+  "files": [
+    {
+      "source": "dist/core/LocalPaipan.js",
+      "local": "vendor/zhenyi/core/LocalPaipan.js",
+      "upstreamGitBlob": "bac9925fd17f22b4d7ceaed1004f93392415c1b6",
+      "sha256": "cb2df8093c106334d06e898a20f15b870146185a03037d2549cc7fb2c85b3e32",
+      "bytes": 37303,
+      "url": "https://github.com/ZHENYI-ORG/Zhenyi-bazi/blob/383a726437a81db2b87eed517ef5e6ccd30b7bd4/dist/core/LocalPaipan.js"
+    },
+    {
+      "source": "dist/core/TrueSolarTimeCalculator.js",
+      "local": "vendor/zhenyi/core/TrueSolarTimeCalculator.js",
+      "upstreamGitBlob": "c88a98cd8b7a3a1103eaebf5e09900f7a162bdc0",
+      "sha256": "f8ff20694f596963ed33baa364cc1abf2b7d72e1d98cb5038850cbc6aa1e4a78",
+      "bytes": 6909,
+      "url": "https://github.com/ZHENYI-ORG/Zhenyi-bazi/blob/383a726437a81db2b87eed517ef5e6ccd30b7bd4/dist/core/TrueSolarTimeCalculator.js"
+    },
+    {
+      "source": "dist/data/nayin.json",
+      "local": "vendor/zhenyi/data/nayin.json",
+      "upstreamGitBlob": "de553b3ec60e01afd77001a111eaa672297c50bf",
+      "sha256": "d835cff7b8d5dbfccf43e67239e4eef7fc442affd0e8da966c972a17e0f5d944",
+      "bytes": 3913,
+      "url": "https://github.com/ZHENYI-ORG/Zhenyi-bazi/blob/383a726437a81db2b87eed517ef5e6ccd30b7bd4/dist/data/nayin.json"
+    },
+    {
+      "source": "dist/data/eot.json",
+      "local": "vendor/zhenyi/data/eot.json",
+      "upstreamGitBlob": "bff8cdbcf025028fe66b389f249553595de9b091",
+      "sha256": "39b2475e9e92b773ab0c0b53e8c238adb8fa4c488543ba2747c7de5aed68d15b",
+      "bytes": 23954,
+      "url": "https://github.com/ZHENYI-ORG/Zhenyi-bazi/blob/383a726437a81db2b87eed517ef5e6ccd30b7bd4/dist/data/eot.json"
+    },
+    {
+      "source": "LICENSE",
+      "local": "vendor/zhenyi/LICENSE",
+      "upstreamGitBlob": "1eb9be9b3d6f32313095a23635f1e1ec6288d644",
+      "sha256": "e5b507b7fe430e46cb55028e669f6f54ce17a8f4e6dfdf10652c293a8abb75a9",
+      "bytes": 1063,
+      "url": "https://github.com/ZHENYI-ORG/Zhenyi-bazi/blob/383a726437a81db2b87eed517ef5e6ccd30b7bd4/LICENSE"
+    }
+  ]
+}

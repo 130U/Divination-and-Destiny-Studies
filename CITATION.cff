@@ -1,0 +1,36 @@
+cff-version: 1.2.0
+message: "If you use this work, please cite it as below."
+type: software
+title: "Divination and Destiny Studies"
+version: "V_202611"
+date-released: 2026-11-19
+abstract: "Can a language model read a person's chart against their life without ever calculating the chart, seeing a server, or spending anyone's money but theirs? The browser app, its calendar engine and 103 tests."
+authors:
+  - family-names: Ouyang
+    given-names: "Letao (Theodore)"
+repository-code: "https://github.com/130U/ENGINEERING-Divination-and-Destiny-Studies"
+url: "https://www.theodoreoy.com/ENGINEERING-Divination-and-Destiny-Studies/"
+license: MIT
+keywords:
+  - bazi
+  - chinese calendar
+  - deepseek
+  - browser app
+  - typescript
+  - privacy
+references:
+  - type: software
+    title: "Zhenyi-bazi"
+    authors:
+      - name: "ZhenYi"
+    repository-code: "https://github.com/ZHENYI-ORG/Zhenyi-bazi"
+    commit: "383a726437a81db2b87eed517ef5e6ccd30b7bd4"
+    license: MIT
+preferred-citation:
+  type: software
+  title: "Divination and Destiny Studies"
+  authors:
+    - family-names: Ouyang
+      given-names: "Letao (Theodore)"
+  year: 2026
+  url: "https://www.theodoreoy.com/ENGINEERING-Divination-and-Destiny-Studies/"

@@ -1,0 +1,164 @@
+import { generateCandidateCharts, type BirthInput, type CandidateSet } from './chartEngine.ts';
+import { buildEvidence, getQuestionnaire, normalizeAnswers, QuestionnaireValidationError, type EvidenceItem } from './questionnaire.ts';
+import { createDeepSeekClient, type DeepSeekResult } from './deepseek.ts';
+import { ANALYSIS_SYSTEM, REVIEW_SYSTEM, analysisPayload, reviewPayload, chartReferencePaths, referenceableEvidenceIds } from './prompts.ts';
+import { validateAnalysis, validateReview, type ChartReview, type PersonalAnalysis } from './results.ts';
+import { AppError, assertNoSecrets, exactKeys, freeze, record, runtime } from './runtime.ts';
+
+export interface ModelEnvelope<T> {
+  result: T;
+  usage: DeepSeekResult['usage'];
+  model: string;
+  providerModel?: string;
+  requestId?: string;
+  durationMs: number;
+}
+interface Session {
+  id: string; createdAt: string; expiresAt: string; expires: number; asOfDate: string; expiryTimer?: ReturnType<typeof setTimeout>;
+  candidateSet: CandidateSet; evidence: EvidenceItem[]; context: EvidenceItem[];
+  review?: ModelEnvelope<ChartReview>; reviewPending: boolean;
+  analyses: Map<string, ModelEnvelope<PersonalAnalysis>>; analysisPending: boolean;
+}
+export interface WorkflowOptions {
+  client?: ReturnType<typeof createDeepSeekClient>;
+  chartGenerator?: typeof generateCandidateCharts;
+  now?: () => number;
+}
+
+function validateModelResult<T>(stage: 'review' | 'analysis', meta: Omit<DeepSeekResult, 'data'>, validate: () => T): T {
+  try { return validate(); }
+  catch (error) {
+    if (error instanceof AppError) {
+      Object.assign(error, { modelAttempt: {
+        stage, usage: structuredClone(meta.usage), model: meta.model,
+        ...(meta.providerModel ? { providerModel: meta.providerModel } : {}), durationMs: meta.durationMs,
+      } });
+    }
+    throw error;
+  }
+}
+
+export class Workflow {
+  private sessions = new Map<string, Session>();
+  private client: ReturnType<typeof createDeepSeekClient>;
+  private chartGenerator: typeof generateCandidateCharts;
+  private now: () => number;
+  private activeModelCalls = 0;
+
+  constructor(options: WorkflowOptions = {}) {
+    this.client = options.client ?? createDeepSeekClient();
+    this.chartGenerator = options.chartGenerator ?? generateCandidateCharts;
+    this.now = options.now ?? Date.now;
+  }
+
+  private prune() {
+    for (const [id, session] of this.sessions) if (session.expires <= this.now()) this.delete(id);
+  }
+
+  private get(id: unknown): Session {
+    this.prune();
+    if (typeof id !== 'string' || !/^[a-f0-9-]{36}$/.test(id)) throw new AppError('INVALID_SESSION', '请先提交出生资料生成候选盘。');
+    const session = this.sessions.get(id);
+    if (!session) throw new AppError('SESSION_EXPIRED', '会话已清除或过期，请重新提交资料。', 410);
+    return session;
+  }
+
+  private stillActive(session: Session) {
+    if (this.sessions.get(session.id) !== session || session.expires <= this.now()) {
+      this.delete(session.id);
+      throw new AppError('SESSION_EXPIRED', '会话已清除或过期，本次结果未保存。', 410);
+    }
+  }
+
+  private enterModel() {
+    if (this.activeModelCalls >= runtime.max_concurrent_model_calls) throw new AppError('MODEL_BUSY', '已有模型请求正在处理，请等待完成。', 409);
+    this.activeModelCalls += 1;
+  }
+
+  create(input: unknown) {
+    this.prune();
+    if (this.sessions.size >= runtime.max_sessions) throw new AppError('SESSION_LIMIT', '本地会话已达到上限，请清除旧会话后再试。', 429);
+    assertNoSecrets(input);
+    const request = record(input, '请求'); exactKeys(request, ['birth', 'answers'], '请求');
+    record(request.birth, '出生资料');
+    const candidateSet = freeze(structuredClone(this.chartGenerator(request.birth as BirthInput)));
+    if (!candidateSet.candidates.length) throw new AppError('NO_CANDIDATES', '给定时间范围内未生成有效候选盘。');
+    const solarBirthDate = candidateSet.candidates[0]!.features.solarDate;
+    if (typeof solarBirthDate !== 'string') throw new AppError('INVALID_CALENDAR_RESULT', '排盘结果缺少公历出生日期。');
+    const asOfDate = new Date(this.now()).toISOString().slice(0, 10);
+    if (solarBirthDate < getQuestionnaire().limits.minimumDate || solarBirthDate > asOfDate) {
+      throw new AppError('BIRTH_DATE_RANGE', '问卷产品支持 1900 年至今天的公历出生日期；农历输入会先转换。');
+    }
+    const questionContext = { birthDate: solarBirthDate, asOfDate };
+    let answers;
+    try { answers = normalizeAnswers(request.answers, questionContext); }
+    catch (cause) {
+      if (!(cause instanceof QuestionnaireValidationError)) throw cause;
+      const error = new AppError('INVALID_QUESTIONNAIRE', '已填写的问卷内容有无效值，请核对标记字段；其余项目可留空。');
+      Object.assign(error, { details: cause.issues }); throw error;
+    }
+    const { evidence, context } = freeze(buildEvidence(answers, questionContext));
+    const now = this.now(), expires = now + runtime.session_ttl_ms;
+    const session: Session = {
+      id: globalThis.crypto.randomUUID(), createdAt: new Date(now).toISOString(), expiresAt: new Date(expires).toISOString(), expires, asOfDate,
+      candidateSet, evidence, context, reviewPending: false, analysisPending: false, analyses: new Map(),
+    };
+    this.sessions.set(session.id, session);
+    session.expiryTimer = setTimeout(() => this.delete(session.id), runtime.session_ttl_ms);
+    session.expiryTimer.unref?.();
+    return structuredClone({ id: session.id, createdAt: session.createdAt, expiresAt: session.expiresAt, asOfDate, candidateSet, evidence, context });
+  }
+
+  async review(id: unknown) {
+    const session = this.get(id);
+    if (session.review) {
+      const { result: review, ...meta } = session.review;
+      return structuredClone({ review, ...meta, cached: true });
+    }
+    if (session.reviewPending) throw new AppError('REVIEW_IN_PROGRESS', '这份资料正在校盘，请等待结果。', 409);
+    const knownIds = referenceableEvidenceIds(session.evidence);
+    const payload = reviewPayload(session.candidateSet, session.evidence, session.asOfDate);
+    this.enterModel(); session.reviewPending = true;
+    try {
+      const { data, ...meta } = await this.client.completeJson({ system: REVIEW_SYSTEM, payload, maxOutputTokens: runtime.review_max_output_tokens });
+      const result = validateModelResult('review', meta, () => validateReview(data, session.candidateSet.candidates.map(chart => chart.id), knownIds));
+      this.stillActive(session);
+      session.review = freeze({ result, ...meta });
+      return structuredClone({ review: result, ...meta, cached: false });
+    } finally { session.reviewPending = false; this.activeModelCalls -= 1; }
+  }
+
+  async analyze(id: unknown, candidateId?: unknown) {
+    const session = this.get(id);
+    if (!session.review) throw new AppError('REVIEW_REQUIRED', '请先完成候选盘复核，再进行深入分析。');
+    const review = session.review.result;
+    const selectedId = candidateId ?? review.recommended_candidate_id;
+    if (typeof selectedId !== 'string') throw new AppError('WORKING_CHART_REQUIRED', '当前没有唯一推荐盘，请明确选择一个暂用工作盘。');
+    const chart = session.candidateSet.candidates.find(item => item.id === selectedId);
+    if (!chart) throw new AppError('INVALID_CANDIDATE', '工作盘必须来自本次计算的候选盘。');
+    const cached = session.analyses.get(selectedId);
+    if (cached) { const { result: analysis, ...meta } = cached; return structuredClone({ analysis, ...meta, cached: true }); }
+    if (session.analysisPending) throw new AppError('ANALYSIS_IN_PROGRESS', '这份资料正在分析，请等待结果。', 409);
+    const selectedBy = selectedId === review.recommended_candidate_id ? review.selection_source ?? 'model' : 'user';
+    const payload = analysisPayload(session.candidateSet, chart, review, session.evidence, session.context, selectedBy, session.asOfDate);
+    const knownIds = referenceableEvidenceIds([...session.evidence, ...session.context]);
+    this.enterModel(); session.analysisPending = true;
+    try {
+      const { data, ...meta } = await this.client.completeJson({ system: ANALYSIS_SYSTEM, payload, maxOutputTokens: runtime.analysis_max_output_tokens });
+      const result = validateModelResult('analysis', meta, () => validateAnalysis(data, selectedId, knownIds, chartReferencePaths(chart)));
+      this.stillActive(session);
+      session.analyses.set(selectedId, freeze({ result, ...meta }));
+      return structuredClone({ analysis: result, ...meta, cached: false });
+    } finally { session.analysisPending = false; this.activeModelCalls -= 1; }
+  }
+
+  delete(id: unknown) {
+    if (typeof id !== 'string') throw new AppError('INVALID_SESSION', '会话 ID 无效。');
+    const session = this.sessions.get(id);
+    if (session?.expiryTimer) clearTimeout(session.expiryTimer);
+    this.sessions.delete(id);
+    return { deleted: true };
+  }
+
+  dispose() { for (const id of this.sessions.keys()) this.delete(id); }
+}
